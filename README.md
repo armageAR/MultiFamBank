@@ -274,7 +274,28 @@ Everything runs in one Railway project, defined in `.railway/railway.ts`:
 | `api` | `apps/api` | Railpack (FrankenPHP). Runs migrations before each deploy; health check at `/api/health`. |
 | `client`, `admin`, `superadmin` | Repository root | Built with `pnpm turbo run build --filter=…` and served as SPAs. `VITE_API_URL` points at the API domain. |
 
-Each service has watch patterns so a change only redeploys the services it affects. Review infrastructure changes with `railway config plan` before `railway config apply` (evaluating the file requires Node.js 22+).
+Each service has watch patterns so a change only redeploys the services it affects. Review infrastructure changes with `railway config plan` before `railway config apply` (evaluating the file requires Node.js 22+). The CLI applies the plan to the linked environment, so run it once per environment (`railway environment link staging`, then `production`).
+
+### Environments and release flow
+
+The project follows trunk-based development:
+
+| Environment | Branch | Deploys when |
+| --- | --- | --- |
+| `staging` | `main` | A pull request is merged into `main` and CI passes. |
+| `production` | `production` | `main` is promoted to `production` and CI passes. |
+
+1. Work on a short-lived branch and open a pull request against `main`. CI (`.github/workflows/ci.yml`) runs API tests against PostgreSQL, Pint, and frontend lint, typecheck, and build.
+2. Merge the pull request. Railway deploys `main` to staging after CI passes.
+3. Once staging is verified, promote exactly that commit to production:
+
+   ```bash
+   git push origin main:production
+   ```
+
+   This only succeeds as a fast-forward. Do not commit directly to `production`.
+
+Each environment has its own database, `APP_KEY`, and Railway domains.
 
 ## Multi-tenant data model
 
