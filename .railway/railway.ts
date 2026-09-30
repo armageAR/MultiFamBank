@@ -57,7 +57,14 @@ export default defineRailway((ctx) => {
     },
   });
 
+  const services = [api, Postgres, frontend("client", repo), frontend("admin", repo), frontend("superadmin", repo)];
+
+  // Staging sleeps when idle (Railway Serverless) and wakes on the first request.
+  if (!ctx.isEnvironment("production")) {
+    for (const node of services) node.deploy = { ...node.deploy, sleepApplication: true };
+  }
+
   return project("MultiFamBank", {
-    resources: [api, Postgres, frontend("client", repo), frontend("admin", repo), frontend("superadmin", repo), postgresVolume],
+    resources: [...services, postgresVolume],
   });
 });

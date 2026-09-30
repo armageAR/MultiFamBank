@@ -295,7 +295,7 @@ The project follows trunk-based development:
 
    This only succeeds as a fast-forward. Do not commit directly to `production`.
 
-Each environment has its own database, `APP_KEY`, and Railway domains.
+Each environment has its own database, `APP_KEY`, and Railway domains. Staging services use Railway Serverless: they sleep after 5–10 minutes without traffic and wake on the next request, so the first request after a pause can be slow or return a 502.
 
 ## Multi-tenant data model
 
