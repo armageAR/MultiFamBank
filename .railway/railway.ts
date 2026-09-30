@@ -34,10 +34,13 @@ export default defineRailway((ctx) => {
     replicas: { [region]: 1 },
     rootDirectory: "/apps/api",
     build: { watchPatterns: ["/apps/api/**"] },
-    preDeploy: "php artisan migrate --force",
+    // Retry so a sleeping staging database has time to wake up before migrations give up.
+    preDeploy: "sh -c 'for i in 1 2 3 4 5 6 7 8 9 10; do php artisan migrate --force && exit 0; sleep 6; done; exit 1'",
     healthcheck: "/api/health",
     healthcheckTimeout: 120,
     env: {
+      // Railpack runs `composer install`; this makes it skip require-dev.
+      COMPOSER_NO_DEV: "1",
       APP_NAME: "MultiFamBank",
       APP_ENV: ctx.isEnvironment("production") ? "production" : "staging",
       APP_DEBUG: "false",
