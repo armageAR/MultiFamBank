@@ -4,7 +4,7 @@ MultiFamBank is the next version of [FamBank](https://github.com/armageAR/famban
 
 Each family operates an independent **bank**, with its own administrator, clients, savings accounts, requests, and expense reports. Clients can belong to multiple banks, while a person can administer only one bank.
 
-> **Project status:** This repository currently documents the product requirements and intended architecture. The applications and features described below are planned, not implemented in this repository. The original FamBank repository contains the first working version.
+> **Project status:** The monorepo is scaffolded and deployed to Railway: each application serves a placeholder page that checks API and database connectivity. The product features described below are planned, not implemented yet. The original FamBank repository contains the first working version.
 
 In this project, “bank” means a private family ledger. MultiFamBank does not hold money, transfer funds, execute currency exchange, or provide banking services. Administrators record money received or delivered outside the application.
 
@@ -227,20 +227,54 @@ The client and administrator PWAs have separate manifests, installation identiti
 
 Native applications and app-store distribution are not required initially. Capacitor can be evaluated later if native capabilities are needed.
 
-### Proposed monorepo layout
-
-These directories are planned and do not exist yet:
+### Monorepo layout
 
 | Path | Purpose |
 | --- | --- |
-| `apps/api/` | Shared Laravel API. |
+| `apps/api/` | Shared Laravel API (Composer; not part of the pnpm workspace). |
 | `apps/client/` | Client PWA. |
 | `apps/admin/` | Bank administrator PWA. |
 | `apps/superadmin/` | Platform administration web application. |
-| `packages/ui/` | Shared frontend components. |
-| `packages/shared/` | Shared TypeScript contracts, validation, API client, and reusable frontend logic. |
+| `packages/api-client/` | Axios client and API response types. |
+| `packages/ui/` | Shared React components and Tailwind theme tokens. |
+| `packages/offline/` | Dexie databases partitioned per user and bank, for snapshots and the outgoing request queue. |
+| `.railway/railway.ts` | Railway infrastructure as code. |
 
 Separate frontends should reuse common code without sharing inappropriate role-specific controls.
+
+## Local development
+
+Requirements: PHP 8.3+, Composer, Node.js 20.19+ (22 recommended), pnpm 10, and PostgreSQL.
+
+```bash
+pnpm install
+
+cd apps/api
+cp .env.example .env    # set DB_* for your local PostgreSQL
+composer install
+php artisan key:generate
+php artisan migrate
+php artisan serve       # http://localhost:8000
+cd ../..
+
+pnpm dev                # client :5173, admin :5174, superadmin :5175
+```
+
+Frontends read the API base URL from `VITE_API_URL` (default `http://localhost:8000`). The API allows the origins listed in `CORS_ALLOWED_ORIGINS`.
+
+Other root scripts: `pnpm build`, `pnpm typecheck`, `pnpm lint`. API tests: `cd apps/api && php artisan test`.
+
+## Deployment
+
+Everything runs in one Railway project, defined in `.railway/railway.ts`:
+
+| Service | Source | Notes |
+| --- | --- | --- |
+| `Postgres` | Railway PostgreSQL | Referenced by the API through `DB_URL`. |
+| `api` | `apps/api` | Railpack (FrankenPHP). Runs migrations before each deploy; health check at `/api/health`. |
+| `client`, `admin`, `superadmin` | Repository root | Built with `pnpm turbo run build --filter=…` and served as SPAs. `VITE_API_URL` points at the API domain. |
+
+Each service has watch patterns so a change only redeploys the services it affects. Review infrastructure changes with `railway config plan` before `railway config apply` (evaluating the file requires Node.js 22+).
 
 ## Multi-tenant data model
 
