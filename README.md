@@ -4,7 +4,7 @@ MultiFamBank is the next version of [FamBank](https://github.com/armageAR/famban
 
 Each family operates an independent **bank**, with its own administrator, clients, savings accounts, requests, and expense reports. Clients can belong to multiple banks, while a person can administer only one bank.
 
-> **Project status:** The monorepo is scaffolded and deployed to Railway: each application serves a placeholder page that checks API and database connectivity. The product features described below are planned, not implemented yet. The original FamBank repository contains the first working version.
+> **Project status:** The monorepo is deployed to Railway. Implemented so far: the full database schema, sign-in and password reset, the platform superadmin application (bank list, bank creation with an administrator invitation, and invitation resend), and invitation acceptance plus bank setup in the administrator application. Client features, requests, confirmations, and reports are planned, not implemented yet. The original FamBank repository contains the first working version.
 
 In this project, “bank” means a private family ledger. MultiFamBank does not hold money, transfer funds, execute currency exchange, or provide banking services. Administrators record money received or delivered outside the application.
 
@@ -235,7 +235,8 @@ Native applications and app-store distribution are not required initially. Capac
 | `apps/client/` | Client PWA. |
 | `apps/admin/` | Bank administrator PWA. |
 | `apps/superadmin/` | Platform administration web application. |
-| `packages/api-client/` | Axios client and API response types. |
+| `packages/api-client/` | Axios client, API endpoints and response types, error and token helpers. |
+| `packages/auth/` | React session provider (`AuthProvider`, `useAuth`) shared by the frontends. |
 | `packages/ui/` | Shared React components and Tailwind theme tokens. |
 | `packages/offline/` | Dexie databases partitioned per user and bank, for snapshots and the outgoing request queue. |
 | `.railway/railway.ts` | Railway infrastructure as code. |
@@ -297,6 +298,26 @@ The project follows trunk-based development:
 
 Each environment has its own database, `APP_KEY`, and Railway domains. Staging services use Railway Serverless: they sleep after 5–10 minutes without traffic and wake on the next request, so the first request after a pause can be slow or return a 502.
 
+### Platform superadmin
+
+There is exactly one superadmin (enforced by a unique index). Create it once per environment:
+
+```bash
+php artisan superadmin:create armage@example.com "Full Name"
+# On Railway:
+railway ssh --service api --environment staging -- php artisan superadmin:create armage@example.com "Full Name"
+```
+
+The command prints a one-time link to the superadmin application to set the password (valid for 60 minutes), so the password never passes through the console, shell history, or environment variables. An existing identity with that email is promoted instead of duplicated.
+
+### Email
+
+Invitations and password resets are Laravel mailables and notifications. Delivery uses [Resend](https://resend.com) through Laravel's built-in `resend` mailer.
+
+While `MAIL_MAILER=log` (the current setting, as in the original FamBank), emails are written to the logs and the API returns each new invitation link to the superadmin application, which shows it for manual sharing. To deliver real emails, in `.railway/railway.ts` set `MAIL_MAILER` to `"resend"`, add `RESEND_API_KEY: preserve()`, set the key with `railway variable set RESEND_API_KEY=... --service api`, and use a sender on a domain verified in Resend (`MAIL_FROM_ADDRESS`). Invitation links are no longer exposed once a real mailer is configured.
+
+With `log`, password reset links also end up in the logs, so anyone with access to the Railway logs could reset any account, including the superadmin's. That is acceptable only while there are no real users; switch to Resend before inviting real families.
+
 ## Multi-tenant data model
 
 The initial design uses a shared database with bank-scoped records rather than a separate database or deployment per family.
@@ -313,7 +334,7 @@ The initial design uses a shared database with bank-scoped records rather than a
 | Ledger records | Confirmed savings movements and bank-funded expenses. |
 | Audit records | Original and final values, responsible actor, and relevant lifecycle or financial changes. |
 
-Database constraints should enforce unique user emails, one bank administrator assignment per person, and one client membership/account per bank and user. Invitation acceptance and bank creation must enforce these rules atomically.
+The schema lives in `apps/api/database/migrations`. The database enforces unique user emails, a single superadmin, one administrator per bank and one bank per administrator (`banks.admin_email` and `banks.admin_user_id` are unique, so pending invitations also reserve the email), one membership and savings account per bank and user, one reservation and one ledger entry per request, reservations never above the balance, and deposits never funded by the bank. Bank creation and invitation acceptance run in transactions with row locks.
 
 Every bank-scoped API query and write must verify tenant access. Supplying another bank's ID must never grant access to its accounts, requests, reports, or notifications.
 
