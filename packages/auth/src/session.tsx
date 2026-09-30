@@ -24,8 +24,9 @@ export function AuthProvider({ api, tokenStore, children }: { api: AxiosInstance
     () =>
       tokenStore.subscribe((next) => {
         setToken(next)
-        // Nothing cached for one account may be shown to the next one.
-        if (next === null) queryClient.clear()
+        // Drop every cached result so nothing from this account reaches the next one. Reset (not
+        // clear) keeps mounted queries alive and refetches them, e.g. a public invitation page.
+        if (next === null) void queryClient.resetQueries()
       }),
     [tokenStore, queryClient],
   )
@@ -40,7 +41,8 @@ export function AuthProvider({ api, tokenStore, children }: { api: AxiosInstance
 
   const signIn = useCallback(
     (newToken: string, user: User) => {
-      queryClient.clear()
+      // Data cached for a previous account; the current page's queries stay mounted.
+      queryClient.removeQueries({ type: 'inactive' })
       queryClient.setQueryData(['me', newToken], user)
       tokenStore.set(newToken)
     },
