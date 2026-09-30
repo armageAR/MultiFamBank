@@ -20,6 +20,9 @@ importers:
       '@multifambank/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@multifambank/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@multifambank/offline':
         specifier: workspace:*
         version: link:../../packages/offline
@@ -130,6 +133,9 @@ importers:
       '@multifambank/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@multifambank/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@multifambank/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -180,6 +186,28 @@ importers:
         specifier: ^1.20.0
         version: 1.20.0
     devDependencies:
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
+
+  packages/auth:
+    dependencies:
+      '@multifambank/api-client':
+        specifier: workspace:*
+        version: link:../api-client
+    devDependencies:
+      '@tanstack/react-query':
+        specifier: ^5.104.0
+        version: 5.104.0(react@19.3.0)
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.3.0
+      axios:
+        specifier: ^1.20.0
+        version: 1.20.0
+      react:
+        specifier: ^19.2.8
+        version: 19.3.0
       typescript:
         specifier: ~6.0.2
         version: 6.0.3

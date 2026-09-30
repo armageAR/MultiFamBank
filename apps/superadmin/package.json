@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@multifambank/api-client": "workspace:*",
+    "@multifambank/auth": "workspace:*",
     "@multifambank/ui": "workspace:*",
     "@tanstack/react-query": "^5.104.0",
     "react": "^19.2.8",

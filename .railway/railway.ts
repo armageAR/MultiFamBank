@@ -55,6 +55,16 @@ export default defineRailway((ctx) => {
       SESSION_DRIVER: "database",
       CACHE_STORE: "database",
       QUEUE_CONNECTION: "database",
+      // Frontend URLs used in email links (invitations, password resets).
+      CLIENT_APP_URL: "https://${{client.RAILWAY_PUBLIC_DOMAIN}}",
+      ADMIN_APP_URL: "https://${{admin.RAILWAY_PUBLIC_DOMAIN}}",
+      SUPERADMIN_APP_URL: "https://${{superadmin.RAILWAY_PUBLIC_DOMAIN}}",
+      // "log" until Resend is set up: emails go to the logs and the superadmin sees invitation links.
+      // To deliver real emails: MAIL_MAILER "resend", add RESEND_API_KEY: preserve(), and set its value
+      // with `railway variable set RESEND_API_KEY=... --service api`.
+      MAIL_MAILER: "log",
+      MAIL_FROM_ADDRESS: "onboarding@resend.dev",
+      MAIL_FROM_NAME: "MultiFamBank",
       CORS_ALLOWED_ORIGINS:
         "https://${{client.RAILWAY_PUBLIC_DOMAIN}},https://${{admin.RAILWAY_PUBLIC_DOMAIN}},https://${{superadmin.RAILWAY_PUBLIC_DOMAIN}}",
     },
