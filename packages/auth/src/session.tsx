@@ -24,7 +24,8 @@ export function AuthProvider({ api, tokenStore, children }: { api: AxiosInstance
     () =>
       tokenStore.subscribe((next) => {
         setToken(next)
-        if (next === null) queryClient.removeQueries({ queryKey: ['me'] })
+        // Nothing cached for one account may be shown to the next one.
+        if (next === null) queryClient.clear()
       }),
     [tokenStore, queryClient],
   )
@@ -39,6 +40,7 @@ export function AuthProvider({ api, tokenStore, children }: { api: AxiosInstance
 
   const signIn = useCallback(
     (newToken: string, user: User) => {
+      queryClient.clear()
       queryClient.setQueryData(['me', newToken], user)
       tokenStore.set(newToken)
     },

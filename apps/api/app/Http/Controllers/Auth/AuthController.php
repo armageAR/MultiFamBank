@@ -12,6 +12,9 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    /** Bcrypt hash (cost 12, same as real passwords) of a random value nobody knows. */
+    private const DUMMY_HASH = '$2y$12$KY4A21ZrHZZ4ITelrkUTS.Ij04JDzl9zMV2B7LEY4zI6MVL6QX2K6';
+
     /** @unauthenticated */
     public function login(Request $request): JsonResponse
     {
@@ -23,7 +26,7 @@ class AuthController extends Controller
 
         $user = User::where('email', User::normalizeEmail($data['email']))->first();
         // Hash even for unknown emails so response time does not reveal which accounts exist.
-        $passwordMatches = Hash::check($data['password'], $user?->password ?? self::dummyHash());
+        $passwordMatches = Hash::check($data['password'], $user?->password ?? self::DUMMY_HASH);
 
         if (! $user || ! $user->active || ! $passwordMatches) {
             throw ValidationException::withMessages(['email' => 'El email o la contraseña no son correctos.']);
@@ -35,13 +38,6 @@ class AuthController extends Controller
             'token' => $user->createToken($data['device_name'] ?? 'web')->plainTextToken,
             'user' => new UserResource($user),
         ]);
-    }
-
-    private static function dummyHash(): string
-    {
-        static $hash = null;
-
-        return $hash ??= Hash::make('multifambank-timing-equalizer');
     }
 
     public function me(Request $request): UserResource

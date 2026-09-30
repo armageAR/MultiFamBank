@@ -99,7 +99,7 @@ class BankProvisioning
             ]);
 
             return [$bank, $invitation];
-        });
+        }, attempts: 3);
 
         return $this->deliver($bank, $invitation, $token);
     }

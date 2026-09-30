@@ -37,12 +37,16 @@ class InvitationAcceptance
 
     private function acceptInTransaction(string $token, array $input): User
     {
-        return DB::transaction(function () use ($token, $input) {
-            $invitation = Invitation::where('token_hash', Invitation::hashToken($token))->lockForUpdate()->first();
+        $bankId = Invitation::where('token_hash', Invitation::hashToken($token))->value('bank_id');
 
-            if (! $invitation) {
-                throw new DomainRuleException('token', 'La invitación no existe.');
-            }
+        if ($bankId === null) {
+            throw new DomainRuleException('token', 'La invitación no existe.');
+        }
+
+        // Lock order is bank, then invitation — the same as BankProvisioning — so the two cannot deadlock.
+        return DB::transaction(function () use ($token, $input, $bankId) {
+            $bank = Bank::whereKey($bankId)->lockForUpdate()->firstOrFail();
+            $invitation = Invitation::where('token_hash', Invitation::hashToken($token))->lockForUpdate()->firstOrFail();
 
             if (! $invitation->isAcceptable()) {
                 throw new DomainRuleException('token', match ($invitation->state()) {
@@ -51,8 +55,6 @@ class InvitationAcceptance
                     default => 'Esta invitación ya no es válida.',
                 });
             }
-
-            $bank = Bank::whereKey($invitation->bank_id)->lockForUpdate()->firstOrFail();
 
             if ($bank->status === BankStatus::Deactivated
                 || ($invitation->type === InvitationType::BankClient && $bank->status !== BankStatus::Active)) {
@@ -74,7 +76,7 @@ class InvitationAcceptance
             ]);
 
             return $user;
-        });
+        }, attempts: 3);
     }
 
     private function resolveUser(Invitation $invitation, array $input): User
