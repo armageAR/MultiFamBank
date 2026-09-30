@@ -1,10 +1,9 @@
 import { defineRailway, github, postgres, preserve, project, service, volume } from "railway/iac";
 
 const region = "us-east4-eqdc4a";
-const repo = github("armageAR/MultiFamBank", { branch: "main" });
 
 // Frontends build from the repo root so they can resolve the pnpm workspace packages.
-function frontend(name: "client" | "admin" | "superadmin") {
+function frontend(name: "client" | "admin" | "superadmin", repo: ReturnType<typeof github>) {
   return service(name, {
     source: repo,
     replicas: { [region]: 1 },
@@ -20,7 +19,12 @@ function frontend(name: "client" | "admin" | "superadmin") {
   });
 }
 
-export default defineRailway(() => {
+export default defineRailway((ctx) => {
+  // Trunk-based flow: main deploys to staging; production only receives fast-forwards of main.
+  // checkSuites makes Railway wait for GitHub CI to pass before deploying a commit.
+  const branch = ctx.isEnvironment("production") ? "production" : "main";
+  const repo = github("armageAR/MultiFamBank", { branch, checkSuites: true });
+
   const Postgres = postgres("Postgres", { region });
   Postgres.networking = { privateNetworkEndpoint: "postgres" };
   const postgresVolume = volume("postgres-volume", { alerts: { usage: { "100": {}, "80": {}, "95": {} } }, allowOnlineResize: true, region, sizeMB: 5000 });
@@ -35,7 +39,7 @@ export default defineRailway(() => {
     healthcheckTimeout: 120,
     env: {
       APP_NAME: "MultiFamBank",
-      APP_ENV: "production",
+      APP_ENV: ctx.isEnvironment("production") ? "production" : "staging",
       APP_DEBUG: "false",
       APP_KEY: preserve(),
       APP_URL: "https://${{RAILWAY_PUBLIC_DOMAIN}}",
@@ -54,6 +58,6 @@ export default defineRailway(() => {
   });
 
   return project("MultiFamBank", {
-    resources: [api, Postgres, frontend("client"), frontend("admin"), frontend("superadmin"), postgresVolume],
+    resources: [api, Postgres, frontend("client", repo), frontend("admin", repo), frontend("superadmin", repo), postgresVolume],
   });
 });
