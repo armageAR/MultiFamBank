@@ -1,10 +1,12 @@
-import { defineRailway, postgres, preserve, project, service, volume } from "railway/iac";
+import { defineRailway, github, postgres, preserve, project, service, volume } from "railway/iac";
 
 const region = "us-east4-eqdc4a";
+const repo = github("armageAR/MultiFamBank", { branch: "main" });
 
 // Frontends build from the repo root so they can resolve the pnpm workspace packages.
 function frontend(name: "client" | "admin" | "superadmin") {
   return service(name, {
+    source: repo,
     replicas: { [region]: 1 },
     build: {
       buildCommand: `pnpm turbo run build --filter=@multifambank/${name}`,
@@ -24,6 +26,7 @@ export default defineRailway(() => {
   const postgresVolume = volume("postgres-volume", { alerts: { usage: { "100": {}, "80": {}, "95": {} } }, allowOnlineResize: true, region, sizeMB: 5000 });
 
   const api = service("api", {
+    source: repo,
     replicas: { [region]: 1 },
     rootDirectory: "/apps/api",
     build: { watchPatterns: ["/apps/api/**"] },
