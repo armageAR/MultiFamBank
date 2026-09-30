@@ -4,7 +4,7 @@ MultiFamBank is the next version of [FamBank](https://github.com/armageAR/famban
 
 Each family operates an independent **bank**, with its own administrator, clients, savings accounts, requests, and expense reports. Clients can belong to multiple banks, while a person can administer only one bank.
 
-> **Project status:** The monorepo is deployed to Railway. Implemented so far: the full database schema, sign-in and password reset, the platform superadmin application (bank list and bank creation with an administrator invitation), and invitation acceptance plus bank setup in the administrator application. Client features, requests, confirmations, and reports are planned, not implemented yet. The original FamBank repository contains the first working version.
+> **Project status:** The monorepo is deployed to Railway. Implemented so far: the full database schema, sign-in and password reset, the platform superadmin application (bank list, bank creation with an administrator invitation, and invitation resend), and invitation acceptance plus bank setup in the administrator application. Client features, requests, confirmations, and reports are planned, not implemented yet. The original FamBank repository contains the first working version.
 
 In this project, “bank” means a private family ledger. MultiFamBank does not hold money, transfer funds, execute currency exchange, or provide banking services. Administrators record money received or delivered outside the application.
 
@@ -315,6 +315,8 @@ The command prints a one-time link to the superadmin application to set the pass
 Invitations and password resets are Laravel mailables and notifications. Delivery uses [Resend](https://resend.com) through Laravel's built-in `resend` mailer.
 
 While `MAIL_MAILER=log` (the current setting, as in the original FamBank), emails are written to the logs and the API returns each new invitation link to the superadmin application, which shows it for manual sharing. To deliver real emails, in `.railway/railway.ts` set `MAIL_MAILER` to `"resend"`, add `RESEND_API_KEY: preserve()`, set the key with `railway variable set RESEND_API_KEY=... --service api`, and use a sender on a domain verified in Resend (`MAIL_FROM_ADDRESS`). Invitation links are no longer exposed once a real mailer is configured.
+
+With `log`, password reset links also end up in the logs, so anyone with access to the Railway logs could reset any account, including the superadmin's. That is acceptable only while there are no real users; switch to Resend before inviting real families.
 
 ## Multi-tenant data model
 

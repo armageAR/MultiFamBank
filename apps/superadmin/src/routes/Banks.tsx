@@ -1,9 +1,17 @@
-import { listPlatformBanks, toApiError, type BankStatus, type PlatformBank } from '@multifambank/api-client'
+import {
+  listPlatformBanks,
+  resendAdminInvitation,
+  toApiError,
+  type BankStatus,
+  type CreateBankResponse,
+  type PlatformBank,
+} from '@multifambank/api-client'
 import { Alert, BankStatusBadge, bankStatusLabels, Button, Card } from '@multifambank/ui'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { api } from '../api'
+import { InvitationResult } from '../components/InvitationResult'
 import { formatDate } from '../format'
 
 const statusOrder: BankStatus[] = ['pending_configuration', 'active', 'paused', 'deactivated']
@@ -48,6 +56,24 @@ export function Banks() {
     placeholderData: keepPreviousData,
   })
 
+  const queryClient = useQueryClient()
+  const [resent, setResent] = useState<CreateBankResponse | null>(null)
+  const resend = useMutation({
+    mutationFn: (bank: PlatformBank) => resendAdminInvitation(api, bank.id),
+    onSuccess: (result) => {
+      setResent(result)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return queryClient.invalidateQueries({ queryKey: ['platform-banks'] })
+    },
+  })
+  const actions: RowActions = {
+    onResend: (bank) => {
+      setResent(null)
+      resend.mutate(bank)
+    },
+    resendingId: resend.isPending ? resend.variables?.id : undefined,
+  }
+
   const counts = banks.data?.counts
   const total = counts ? Object.values(counts).reduce((sum, n) => sum + n, 0) : undefined
 
@@ -85,6 +111,18 @@ export function Banks() {
         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-brand-600"
       />
 
+      {resent && (
+        <Card>
+          <div className="space-y-3">
+            <InvitationResult result={resent} title="Invitación reenviada" />
+            <p className="text-xs text-slate-500">Los links anteriores de este banco ya no funcionan.</p>
+            <Button variant="secondary" onClick={() => setResent(null)}>
+              Cerrar
+            </Button>
+          </div>
+        </Card>
+      )}
+      {resend.isError && <Alert tone="error">{toApiError(resend.error).message}</Alert>}
       {banks.isError && <Alert tone="error">{toApiError(banks.error).message}</Alert>}
 
       {banks.isPending ? (
@@ -98,8 +136,8 @@ export function Banks() {
       ) : (
         banks.data && (
           <>
-            <BankTable banks={banks.data.data} />
-            <BankCards banks={banks.data.data} />
+            <BankTable banks={banks.data.data} actions={actions} />
+            <BankCards banks={banks.data.data} actions={actions} />
             {banks.data.meta.last_page > 1 && (
               <nav className="flex items-center justify-between text-sm" aria-label="Paginación">
                 <Button variant="secondary" disabled={page <= 1} onClick={() => updateParams({ pagina: String(page - 1) })}>
@@ -163,7 +201,29 @@ function InvitationSummary({ bank }: { bank: PlatformBank }) {
   }
 }
 
-function BankTable({ banks }: { banks: PlatformBank[] }) {
+interface RowActions {
+  onResend: (bank: PlatformBank) => void
+  resendingId?: number
+}
+
+/** The invitation can be reissued until someone accepts it, unless the bank was deactivated. */
+function ResendButton({ bank, actions }: { bank: PlatformBank; actions: RowActions }) {
+  if (bank.admin.accepted || bank.status === 'deactivated') return null
+
+  return (
+    <Button
+      variant="secondary"
+      className="mt-2 px-3 py-1 text-xs"
+      loading={actions.resendingId === bank.id}
+      disabled={actions.resendingId !== undefined}
+      onClick={() => actions.onResend(bank)}
+    >
+      Reenviar invitación
+    </Button>
+  )
+}
+
+function BankTable({ banks, actions }: { banks: PlatformBank[]; actions: RowActions }) {
   return (
     <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
       <table className="w-full text-left text-sm">
@@ -191,6 +251,7 @@ function BankTable({ banks }: { banks: PlatformBank[] }) {
               </td>
               <td className="px-4 py-3">
                 <InvitationSummary bank={bank} />
+                <ResendButton bank={bank} actions={actions} />
               </td>
               <td className="px-4 py-3 text-slate-600">{formatDate(bank.created_at)}</td>
             </tr>
@@ -201,7 +262,7 @@ function BankTable({ banks }: { banks: PlatformBank[] }) {
   )
 }
 
-function BankCards({ banks }: { banks: PlatformBank[] }) {
+function BankCards({ banks, actions }: { banks: PlatformBank[]; actions: RowActions }) {
   return (
     <ul className="space-y-3 md:hidden">
       {banks.map((bank) => (
@@ -212,9 +273,10 @@ function BankCards({ banks }: { banks: PlatformBank[] }) {
           </div>
           <p className="mt-2 text-sm">{bank.admin.name ?? '—'}</p>
           <p className="text-sm break-all text-slate-500">{bank.admin.email}</p>
-          <p className="mt-2 text-sm">
+          <div className="mt-2 text-sm">
             <InvitationSummary bank={bank} />
-          </p>
+            <ResendButton bank={bank} actions={actions} />
+          </div>
           <p className="mt-1 text-xs text-slate-500">Creado el {formatDate(bank.created_at)}</p>
         </li>
       ))}

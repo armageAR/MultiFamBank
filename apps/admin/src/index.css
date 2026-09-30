@@ -1,3 +1,4 @@
 @import "tailwindcss";
 @import "@multifambank/ui/theme.css";
 @source "../../../packages/ui/src";
+@source "../../../packages/auth/src";

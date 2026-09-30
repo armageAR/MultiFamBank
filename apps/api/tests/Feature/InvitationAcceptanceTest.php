@@ -129,4 +129,26 @@ class InvitationAcceptanceTest extends TestCase
         $this->assertSame(1, $bank->memberships()->where('user_id', $user->id)->count());
         $this->assertSame(1, $bank->memberships()->sole()->savingsAccount()->count());
     }
+
+    public function test_invitations_to_a_deactivated_bank_cannot_be_accepted(): void
+    {
+        [$bank, , $token] = $this->invite();
+        $bank->update(['status' => BankStatus::Deactivated]);
+
+        $this->postJson("/api/invitations/$token/accept", [
+            'name' => 'Laura', 'password' => 'clave-segura-1', 'password_confirmation' => 'clave-segura-1',
+        ])->assertJsonValidationErrors('token');
+
+        $this->assertSame(0, User::count());
+    }
+
+    public function test_client_invitations_require_an_active_bank(): void
+    {
+        User::factory()->create(['email' => 'nico@example.com']);
+        $bank = Bank::create(['name' => 'Familia', 'admin_email' => 'admin@example.com', 'status' => BankStatus::Paused]);
+        [, , $token] = $this->invite('nico@example.com', InvitationType::BankClient, $bank);
+
+        $this->postJson("/api/invitations/$token/accept", ['password' => 'password'])->assertJsonValidationErrors('token');
+        $this->assertSame(0, $bank->memberships()->count());
+    }
 }

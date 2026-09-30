@@ -25,10 +25,11 @@ class BankController extends Controller
             ->with(['admin', 'adminInvitation'])
             ->when($data['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
             ->when($data['search'] ?? null, function ($query, $search) {
-                $term = '%'.mb_strtolower($search).'%';
+                // "!" escapes LIKE wildcards; a backslash confuses PDO's placeholder parsing on PostgreSQL.
+                $term = '%'.preg_replace('/[!%_]/', '!$0', mb_strtolower($search)).'%';
                 $query->where(fn ($query) => $query
-                    ->whereRaw('lower(name) like ?', [$term])
-                    ->orWhere('admin_email', 'like', $term));
+                    ->whereRaw("lower(name) like ? escape '!'", [$term])
+                    ->orWhereRaw("admin_email like ? escape '!'", [$term]));
             })
             ->latest('id')
             ->paginate(25);
@@ -48,13 +49,26 @@ class BankController extends Controller
         ]);
 
         $result = $provisioning->createWithAdminInvitation($data['admin_email'], $data['admin_name'], $request->user());
-        $bank = $result['bank']->load(['admin', 'adminInvitation']);
+
+        return $this->invitationResponse($result, 201);
+    }
+
+    /** Issues a new administrator invitation; earlier links stop working. */
+    public function resendInvitation(Request $request, Bank $bank, BankProvisioning $provisioning): JsonResponse
+    {
+        return $this->invitationResponse($provisioning->resendAdminInvitation($bank, $request->user()), 200);
+    }
+
+    /** @param  array{bank: Bank, accept_url: string, email_sent: bool}  $result */
+    private function invitationResponse(array $result, int $status): JsonResponse
+    {
+        $bank = $result['bank']->fresh(['admin', 'adminInvitation']);
 
         return response()->json([
             'data' => new PlatformBankResource($bank),
             'email_sent' => $result['email_sent'],
             // Only while email delivery is not configured; see config/multifambank.php.
             'invitation_url' => config('multifambank.expose_invitation_links') ? $result['accept_url'] : null,
-        ], 201);
+        ], $status);
     }
 }

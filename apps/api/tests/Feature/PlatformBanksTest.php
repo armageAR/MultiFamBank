@@ -150,4 +150,69 @@ class PlatformBanksTest extends TestCase
         $this->postJson('/api/platform/banks', ['admin_email' => 'not-an-email', 'admin_name' => ''])
             ->assertJsonValidationErrors(['admin_email', 'admin_name']);
     }
+
+    public function test_resending_replaces_the_invitation_without_creating_a_bank(): void
+    {
+        Sanctum::actingAs($this->superadmin);
+        config(['multifambank.expose_invitation_links' => true]);
+        $firstUrl = $this->postJson('/api/platform/banks', ['admin_email' => 'laura@example.com', 'admin_name' => 'Laura'])->json('invitation_url');
+        $bank = Bank::sole();
+        $bank->adminInvitation->update(['expires_at' => now()->subDay()]);
+
+        $response = $this->postJson("/api/platform/banks/{$bank->id}/admin-invitation");
+
+        $response->assertOk()
+            ->assertJsonPath('data.invitation.state', 'pending')
+            ->assertJsonPath('data.admin.name', 'Laura')
+            ->assertJsonPath('email_sent', true);
+        $secondUrl = $response->json('invitation_url');
+        $this->assertNotSame($firstUrl, $secondUrl);
+        $this->assertSame(1, Bank::count());
+        $this->assertSame(2, Invitation::count());
+        $this->assertNotNull(Invitation::oldest('id')->first()->revoked_at);
+        Mail::assertSentCount(2);
+
+        $this->getJson('/api/invitations/'.basename($firstUrl))->assertJsonPath('state', 'revoked');
+        $this->getJson('/api/invitations/'.basename($secondUrl))->assertJsonPath('state', 'pending');
+        $this->assertDatabaseHas('audit_logs', ['action' => 'bank.admin_invitation_resent', 'bank_id' => $bank->id]);
+    }
+
+    public function test_an_accepted_invitation_cannot_be_resent(): void
+    {
+        $admin = User::factory()->create();
+        $bank = Bank::create(['admin_email' => $admin->email, 'admin_user_id' => $admin->id, 'status' => BankStatus::Active]);
+        Sanctum::actingAs($this->superadmin);
+
+        $this->postJson("/api/platform/banks/{$bank->id}/admin-invitation")->assertJsonValidationErrors('bank');
+
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/platform/banks/{$bank->id}/admin-invitation")->assertForbidden();
+    }
+
+    public function test_the_admin_invitation_ignores_newer_client_invitations(): void
+    {
+        Sanctum::actingAs($this->superadmin);
+        $this->postJson('/api/platform/banks', ['admin_email' => 'laura@example.com', 'admin_name' => 'Laura'])->assertCreated();
+        $bank = Bank::sole();
+        $bank->invitations()->create([
+            'type' => InvitationType::BankClient,
+            'email' => 'client@example.com',
+            'name' => 'Cliente',
+            'token_hash' => Invitation::hashToken('client-token'),
+            'expires_at' => now()->addDay(),
+        ]);
+
+        $this->assertSame(InvitationType::BankAdmin, $bank->fresh()->adminInvitation->type);
+        $this->getJson('/api/platform/banks')->assertJsonPath('data.0.admin.name', 'Laura');
+    }
+
+    public function test_search_treats_wildcards_literally(): void
+    {
+        Bank::create(['name' => 'Familia Gómez', 'admin_email' => 'a@example.com']);
+        Bank::create(['name' => '100% Ahorro', 'admin_email' => 'b@example.com']);
+        Sanctum::actingAs($this->superadmin);
+
+        $this->getJson('/api/platform/banks?search=%25')->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', '100% Ahorro');
+        $this->getJson('/api/platform/banks?search=_')->assertJsonCount(0, 'data');
+    }
 }

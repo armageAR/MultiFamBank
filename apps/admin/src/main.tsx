@@ -1,4 +1,4 @@
-import { AuthProvider } from '@multifambank/auth'
+import { AuthProvider, ForgotPasswordPage, LoginPage, ResetPasswordPage } from '@multifambank/auth'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -8,14 +8,15 @@ import './index.css'
 import { AcceptInvitation } from './routes/AcceptInvitation'
 import { BankHome } from './routes/BankHome'
 import { BankSetup } from './routes/BankSetup'
-import { Login } from './routes/Login'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 })
 
 const router = createBrowserRouter([
-  { path: '/ingresar', element: <Login /> },
+  { path: '/ingresar', element: <LoginPage appName="Administración" api={api} /> },
+  { path: '/olvide-contrasena', element: <ForgotPasswordPage appName="Administración" api={api} /> },
+  { path: '/restablecer-contrasena', element: <ResetPasswordPage appName="Administración" api={api} /> },
   { path: '/invitacion/:token', element: <AcceptInvitation /> },
   { path: '/configurar-banco', element: <BankSetup /> },
   { path: '/', element: <BankHome /> },

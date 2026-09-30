@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\BankStatus;
 use App\Enums\InvitationType;
 use App\Enums\MembershipStatus;
 use App\Exceptions\DomainRuleException;
@@ -9,6 +10,7 @@ use App\Models\AuditLog;
 use App\Models\Bank;
 use App\Models\Invitation;
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -23,6 +25,17 @@ class InvitationAcceptance
      * @throws DomainRuleException
      */
     public function accept(string $token, array $input): User
+    {
+        try {
+            return $this->acceptInTransaction($token, $input);
+        } catch (UniqueConstraintViolationException) {
+            // Another invitation for the same person was accepted at the same moment. Nothing was
+            // written; retrying takes the existing-identity path.
+            throw new DomainRuleException('token', 'No pudimos completar la aceptación. Volvé a intentarlo.');
+        }
+    }
+
+    private function acceptInTransaction(string $token, array $input): User
     {
         return DB::transaction(function () use ($token, $input) {
             $invitation = Invitation::where('token_hash', Invitation::hashToken($token))->lockForUpdate()->first();
@@ -39,8 +52,14 @@ class InvitationAcceptance
                 });
             }
 
-            $user = $this->resolveUser($invitation, $input);
             $bank = Bank::whereKey($invitation->bank_id)->lockForUpdate()->firstOrFail();
+
+            if ($bank->status === BankStatus::Deactivated
+                || ($invitation->type === InvitationType::BankClient && $bank->status !== BankStatus::Active)) {
+                throw new DomainRuleException('token', 'El banco no está disponible en este momento.');
+            }
+
+            $user = $this->resolveUser($invitation, $input);
 
             match ($invitation->type) {
                 InvitationType::BankAdmin => $this->assignAdministrator($bank, $user),

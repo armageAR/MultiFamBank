@@ -52,8 +52,7 @@ class Bank extends Model
     public function adminInvitation(): HasOne
     {
         return $this->hasOne(Invitation::class)
-            ->where('type', InvitationType::BankAdmin)
-            ->latestOfMany();
+            ->ofMany(['id' => 'max'], fn ($query) => $query->where('type', InvitationType::BankAdmin));
     }
 
     public function moneyRequests(): HasMany

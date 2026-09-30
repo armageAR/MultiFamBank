@@ -69,6 +69,12 @@ export async function createPlatformBank(
   return data
 }
 
+/** Issues a new administrator invitation for a bank nobody has accepted yet; earlier links stop working. */
+export async function resendAdminInvitation(client: AxiosInstance, bankId: number): Promise<CreateBankResponse> {
+  const { data } = await client.post<CreateBankResponse>(`/platform/banks/${bankId}/admin-invitation`)
+  return data
+}
+
 // Invitations
 
 export async function fetchInvitation(client: AxiosInstance, token: string): Promise<InvitationDetails> {

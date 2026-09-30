@@ -5,8 +5,6 @@ export const tokenStore = createTokenStore('mfb.admin.token')
 export const api = createApiClient({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8000',
   getToken: tokenStore.get,
-  onUnauthorized: () => {
-    tokenStore.clear()
-    window.location.assign('/ingresar')
-  },
+  // Protected pages redirect to sign-in once the session is gone; public pages keep working.
+  onUnauthorized: () => tokenStore.clear(),
 })
