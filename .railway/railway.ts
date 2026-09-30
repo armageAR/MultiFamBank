@@ -38,6 +38,8 @@ export default defineRailway((ctx) => {
     healthcheck: "/api/health",
     healthcheckTimeout: 120,
     env: {
+      // Railpack runs `composer install`; this makes it skip require-dev.
+      COMPOSER_NO_DEV: "1",
       APP_NAME: "MultiFamBank",
       APP_ENV: ctx.isEnvironment("production") ? "production" : "staging",
       APP_DEBUG: "false",
