@@ -30,7 +30,7 @@ export function NewRequestModal({ bankId, onClose }: { bankId: number; onClose: 
       return setError({ message: 'Contá para qué es la plata.', fields: { description: 'Contá para qué es la plata.' } })
     }
 
-    const content = `${type}|${parsed}`
+    const content = `${type}|${parsed}|${description.trim()}`
     if (attempt.current?.content !== content) attempt.current = { content, id: crypto.randomUUID() }
 
     setLoading(true)

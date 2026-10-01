@@ -6,6 +6,14 @@ export function createTokenStore(key: string) {
   const listeners = new Set<(token: string | null) => void>()
   const notify = (token: string | null) => listeners.forEach((listener) => listener(token))
 
+  // Another tab signed out or signed in as someone else: this tab follows, so it never keeps
+  // showing (and caching) the previous account's data with a different token.
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', (event) => {
+      if (event.key === key) notify(event.newValue)
+    })
+  }
+
   return {
     get(): string | null {
       try {
