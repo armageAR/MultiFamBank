@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useLook } from './look'
 
 interface ModalProps {
   title: string
@@ -11,6 +12,7 @@ export function Modal({ title, onClose, children }: ModalProps) {
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const pressedOnBackdrop = useRef(false)
+  const family = useLook() === 'family'
 
   // No close() on cleanup: it would fire onClose during StrictMode's remount, and an unmounted
   // dialog leaves the page anyway.
@@ -36,10 +38,17 @@ export function Modal({ title, onClose, children }: ModalProps) {
         if (pressedOnBackdrop.current && event.target === ref.current) requestClose()
         pressedOnBackdrop.current = false
       }}
-      className="m-auto w-[min(48rem,calc(100%-2rem))] max-w-none rounded-xl bg-slate-50 p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/50"
+      className={
+        family
+          ? // FamBank: a sheet from the bottom on phones, centered card on larger screens.
+            'mx-auto mt-auto mb-0 max-h-[92dvh] w-full max-w-lg rounded-t-2xl border border-gray-100 bg-white p-0 text-gray-900 shadow-xl backdrop:bg-black/40 backdrop:backdrop-blur-sm sm:m-auto sm:max-h-[90dvh] sm:w-[min(32rem,calc(100%-2rem))] sm:rounded-2xl'
+          : 'm-auto w-[min(48rem,calc(100%-2rem))] max-w-none rounded-xl bg-slate-50 p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/50'
+      }
     >
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
-        <h2 id={titleId} className="text-lg font-semibold">
+      <div
+        className={`sticky top-0 z-10 flex items-center justify-between gap-3 border-b bg-white px-5 py-4 ${family ? 'border-gray-100' : 'border-slate-200'}`}
+      >
+        <h2 id={titleId} className={family ? 'text-sm font-semibold text-gray-900' : 'text-lg font-semibold'}>
           {title}
         </h2>
         <button
@@ -53,7 +62,7 @@ export function Modal({ title, onClose, children }: ModalProps) {
           </svg>
         </button>
       </div>
-      <div className="space-y-4 p-5">{children}</div>
+      <div className={family ? 'flex flex-col gap-4 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]' : 'space-y-4 p-5'}>{children}</div>
     </dialog>
   )
 }

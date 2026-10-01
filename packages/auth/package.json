@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@multifambank/api-client": "workspace:*",
-    "@multifambank/ui": "workspace:*"
+    "@multifambank/ui": "workspace:*",
+    "@tanstack/query-sync-storage-persister": "^5.104.0"
   },
   "peerDependencies": {
     "@tanstack/react-query": "^5.0.0",

@@ -65,6 +65,10 @@ export default defineRailway((ctx) => {
       // "log" until Resend is set up: emails go to the logs and the superadmin sees invitation links.
       // To deliver real emails: MAIL_MAILER "resend", add RESEND_API_KEY: preserve(), and set its value
       // with `railway variable set RESEND_API_KEY=... --service api`.
+      // Web Push keys, one pair per environment (php artisan push:vapid-keys); values live only in Railway.
+      VAPID_PUBLIC_KEY: preserve(),
+      VAPID_PRIVATE_KEY: preserve(),
+      VAPID_SUBJECT: preserve(),
       MAIL_MAILER: "log",
       MAIL_FROM_ADDRESS: "onboarding@resend.dev",
       MAIL_FROM_NAME: "MultiFamBank",

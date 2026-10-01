@@ -1,4 +1,5 @@
 import { fetchMe, logout, type TokenStore, type User } from '@multifambank/api-client'
+import { forgetPushSubscription } from './push'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AxiosInstance } from 'axios'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -15,7 +16,18 @@ export interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 /** Session for one app: the token lives in that app's store, the user comes from /auth/me. */
-export function AuthProvider({ api, tokenStore, children }: { api: AxiosInstance; tokenStore: TokenStore; children: ReactNode }) {
+export function AuthProvider({
+  api,
+  tokenStore,
+  onSessionEnd,
+  children,
+}: {
+  api: AxiosInstance
+  tokenStore: TokenStore
+  /** Called when the session ends (sign-out or expired token), e.g. to wipe an offline cache. */
+  onSessionEnd?: () => void
+  children: ReactNode
+}) {
   const queryClient = useQueryClient()
   const [token, setToken] = useState(tokenStore.get)
 
@@ -26,13 +38,19 @@ export function AuthProvider({ api, tokenStore, children }: { api: AxiosInstance
         setToken(next)
         // Drop every cached result so nothing from this account reaches the next one. Reset (not
         // clear) keeps mounted queries alive and refetches them, e.g. a public invitation page.
-        if (next === null) void queryClient.resetQueries()
+        if (next === null) {
+          // An expired or revoked session also stops this device's notifications.
+          void forgetPushSubscription()
+          onSessionEnd?.()
+          void queryClient.resetQueries()
+        }
       }),
-    [tokenStore, queryClient],
+    [tokenStore, queryClient, onSessionEnd],
   )
 
   const me = useQuery({
-    queryKey: ['me', token],
+    // Not keyed by the token: the key is persisted for offline use and must not contain secrets.
+    queryKey: ['me'],
     queryFn: () => fetchMe(api),
     enabled: token !== null,
     retry: false,
@@ -43,13 +61,14 @@ export function AuthProvider({ api, tokenStore, children }: { api: AxiosInstance
     (newToken: string, user: User) => {
       // Data cached for a previous account; the current page's queries stay mounted.
       queryClient.removeQueries({ type: 'inactive' })
-      queryClient.setQueryData(['me', newToken], user)
+      queryClient.setQueryData(['me'], user)
       tokenStore.set(newToken)
     },
     [queryClient, tokenStore],
   )
 
   const signOut = useCallback(async () => {
+    await forgetPushSubscription(api)
     try {
       await logout(api)
     } catch {
