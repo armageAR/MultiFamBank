@@ -219,7 +219,8 @@ function PasswordForm({ bank, onCancel, onSaved }: { bank: PlatformBankDetail; o
       <TextField
         label="Contraseña nueva"
         type="password"
-        autoComplete="new-password"
+        autoComplete="off"
+        data-1p-ignore
         required
         minLength={8}
         hint="Mínimo 8 caracteres."
@@ -230,7 +231,8 @@ function PasswordForm({ bank, onCancel, onSaved }: { bank: PlatformBankDetail; o
       <TextField
         label="Repetir contraseña"
         type="password"
-        autoComplete="new-password"
+        autoComplete="off"
+        data-1p-ignore
         required
         value={confirmation}
         onChange={(e) => setConfirmation(e.target.value)}

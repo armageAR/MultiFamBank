@@ -19,7 +19,9 @@ class RecordLastSeen
         $user = $request->user();
 
         if ($user && ($user->last_seen_at === null || $user->last_seen_at->lt(now()->subMinutes(self::INTERVAL_MINUTES)))) {
-            $user->forceFill(['last_seen_at' => now()])->saveQuietly();
+            // Targeted update: no other pending attribute is saved and updated_at is left alone.
+            $user->newQuery()->toBase()->where($user->getKeyName(), $user->getKey())->update(['last_seen_at' => now()]);
+            $user->setAttribute('last_seen_at', now())->syncOriginalAttribute('last_seen_at');
         }
 
         return $response;

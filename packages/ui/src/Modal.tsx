@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 
 interface ModalProps {
   title: string
@@ -9,6 +9,8 @@ interface ModalProps {
 /** Native <dialog>: focus trapping, Escape to close and an inert background come from the browser. */
 export function Modal({ title, onClose, children }: ModalProps) {
   const ref = useRef<HTMLDialogElement>(null)
+  const titleId = useId()
+  const pressedOnBackdrop = useRef(false)
 
   // No close() on cleanup: it would fire onClose during StrictMode's remount, and an unmounted
   // dialog leaves the page anyway.
@@ -17,24 +19,32 @@ export function Modal({ title, onClose, children }: ModalProps) {
     if (dialog && !dialog.open) dialog.showModal()
   }, [])
 
+  // Closing through close() lets the browser return focus to the element that opened the dialog;
+  // the resulting "close" event then calls onClose.
+  const requestClose = () => ref.current?.close()
+
   return (
     <dialog
       ref={ref}
-      aria-labelledby="modal-title"
+      aria-labelledby={titleId}
       onClose={onClose}
+      // Only a press and release both on the backdrop closes it, so dragging out of a field does not.
+      onPointerDown={(event) => {
+        pressedOnBackdrop.current = event.target === ref.current
+      }}
       onClick={(event) => {
-        // A click on the backdrop lands on the dialog element itself.
-        if (event.target === ref.current) onClose()
+        if (pressedOnBackdrop.current && event.target === ref.current) requestClose()
+        pressedOnBackdrop.current = false
       }}
       className="m-auto w-[min(48rem,calc(100%-2rem))] max-w-none rounded-xl bg-slate-50 p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/50"
     >
       <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
-        <h2 id="modal-title" className="text-lg font-semibold">
+        <h2 id={titleId} className="text-lg font-semibold">
           {title}
         </h2>
         <button
           type="button"
-          onClick={onClose}
+          onClick={requestClose}
           aria-label="Cerrar"
           className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-brand-600"
         >

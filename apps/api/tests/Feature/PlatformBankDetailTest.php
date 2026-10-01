@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\BankStatus;
+use App\Enums\InvitationType;
 use App\Mail\BankAdminInvitationMail;
 use App\Models\AuditLog;
 use App\Models\Bank;
@@ -11,6 +12,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -181,5 +183,63 @@ class PlatformBankDetailTest extends TestCase
         $this->assertTrue($user->fresh()->last_seen_at->gt($first));
 
         $this->getJson('/api/health')->assertOk();
+    }
+
+    public function test_a_deactivated_bank_cannot_invite_a_different_administrator(): void
+    {
+        $bank = $this->pendingBank();
+        $bank->update(['status' => BankStatus::Deactivated]);
+
+        $this->patchJson("/api/platform/banks/{$bank->id}/admin", ['name' => 'Pendiente', 'email' => 'otro@example.com'])
+            ->assertJsonValidationErrors('email');
+
+        $this->assertSame(1, Invitation::count());
+        Mail::assertSentCount(1);
+    }
+
+    public function test_changing_an_accepted_administrators_email_signs_them_out_and_moves_pending_invitations(): void
+    {
+        [$bank, $admin] = $this->activeBank();
+        $admin->createToken('session');
+        $other = Bank::create(['name' => 'Otra', 'admin_email' => 'otro-admin@example.com', 'status' => BankStatus::Active]);
+        $clientInvite = $other->invitations()->create([
+            'type' => InvitationType::BankClient,
+            'email' => 'laura@example.com',
+            'name' => 'Laura',
+            'token_hash' => Invitation::hashToken('client-token'),
+            'expires_at' => now()->addDay(),
+        ]);
+        Sanctum::actingAs($this->superadmin);
+
+        $this->patchJson("/api/platform/banks/{$bank->id}/admin", ['name' => 'Laura', 'email' => 'laura.nueva@example.com'])->assertOk();
+
+        $this->assertSame(0, $admin->tokens()->count());
+        $this->assertSame('laura.nueva@example.com', $clientInvite->fresh()->email);
+    }
+
+    public function test_setting_the_password_invalidates_pending_reset_links(): void
+    {
+        [$bank, $admin] = $this->activeBank();
+        $resetToken = Password::broker()->createToken($admin);
+        Sanctum::actingAs($this->superadmin);
+
+        $this->putJson("/api/platform/banks/{$bank->id}/admin/password", ['password' => 'clave-nueva-1', 'password_confirmation' => 'clave-nueva-1'])->assertOk();
+
+        $this->postJson('/api/auth/reset-password', [
+            'token' => $resetToken, 'email' => $admin->email, 'password' => 'otra-clave-99', 'password_confirmation' => 'otra-clave-99',
+        ])->assertJsonValidationErrors('token');
+        $this->assertTrue(Hash::check('clave-nueva-1', $admin->fresh()->password));
+    }
+
+    public function test_recording_activity_does_not_touch_updated_at(): void
+    {
+        $user = User::factory()->create();
+        $updatedAt = $user->updated_at;
+        $this->travel(10)->minutes();
+
+        $this->withToken($user->createToken('web')->plainTextToken)->getJson('/api/auth/me')->assertOk();
+
+        $this->assertNotNull($user->fresh()->last_seen_at);
+        $this->assertEquals($updatedAt, $user->fresh()->updated_at);
     }
 }

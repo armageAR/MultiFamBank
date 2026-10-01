@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
 use Throwable;
 
 /**
@@ -134,7 +135,21 @@ class BankProvisioning
 
                     $admin->forceFill(['name' => $name, 'email' => $email])->save();
                     $bank->forceFill(['admin_email' => $email])->save();
+
+                    if ($emailChanged) {
+                        // They sign in with the new address from now on; invitations still pending for the
+                        // old one follow the identity so accepting them cannot create a second user.
+                        $admin->tokens()->delete();
+                        Invitation::where('email', $previous['email'])
+                            ->whereNull('accepted_at')
+                            ->whereNull('revoked_at')
+                            ->update(['email' => $email]);
+                    }
                 } elseif ($emailChanged) {
+                    if ($bank->status === BankStatus::Deactivated) {
+                        throw new DomainRuleException('email', 'El banco está desactivado: no se puede invitar a otro administrador.');
+                    }
+
                     $bank->forceFill(['admin_email' => $email])->save();
                     $this->revokePendingAdminInvitations($bank);
                     $token = Invitation::newToken();
@@ -148,7 +163,8 @@ class BankProvisioning
                 return [$bank, $invitation];
             }, attempts: 3);
         } catch (UniqueConstraintViolationException) {
-            throw $this->emailTaken('email');
+            // Another account or bank took the email at the same moment.
+            throw new DomainRuleException('email', 'Ese email ya está en uso.');
         }
 
         if ($invitation && $token) {
@@ -178,6 +194,8 @@ class BankProvisioning
 
             $admin->forceFill(['password' => Hash::make($password)])->save();
             $admin->tokens()->delete();
+            // An unused reset link must not override the password just set.
+            Password::broker()->deleteToken($admin);
 
             // The password itself is never recorded.
             AuditLog::record('bank.admin_password_set', $admin, $bank->id);
