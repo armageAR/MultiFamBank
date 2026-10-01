@@ -19,7 +19,11 @@ class PushSubscriptionController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'endpoint' => ['required', 'url', 'max:2048'],
+            'endpoint' => ['required', 'url:https', 'max:2048', function (string $attribute, mixed $value, \Closure $fail) {
+                if (! PushNotifications::isKnownPushService((string) $value)) {
+                    $fail('Ese servicio de notificaciones no está soportado.');
+                }
+            }],
             'keys.p256dh' => ['required', 'string', 'max:255'],
             'keys.auth' => ['required', 'string', 'max:255'],
         ]);
@@ -63,8 +67,9 @@ class PushSubscriptionController extends Controller
 
         if ($result['sent'] === 0) {
             return response()->json([
+                // The push service's reply is logged, never echoed back.
                 'message' => $result['failed'] > 0
-                    ? 'El servicio de notificaciones rechazó el envío: '.implode(' · ', array_unique($result['errors']))
+                    ? 'El servicio de notificaciones rechazó el envío. Desactivá y volvé a activar las notificaciones en este dispositivo.'
                     : 'No hay ningún dispositivo registrado para tu usuario. Volvé a activar las notificaciones.',
                 'data' => $result,
             ], 422);

@@ -36,8 +36,9 @@ class PasswordResetController extends Controller
             ['email' => User::normalizeEmail($data['email'])] + $data,
             function (User $user, string $password) {
                 $user->forceFill(['password' => $password])->save();
-                // Sign out every other session.
+                // Sign out every other session, and stop notifications to their devices.
                 $user->tokens()->delete();
+                $user->pushSubscriptions()->delete();
             },
         );
 

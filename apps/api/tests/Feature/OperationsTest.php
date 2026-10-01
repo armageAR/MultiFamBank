@@ -257,4 +257,45 @@ class OperationsTest extends TestCase
         $this->ask(['type' => 'savings_deposit', 'amount_ars' => '1000'])->assertJsonValidationErrors('exchange_rate');
         $this->ask(['type' => 'expense', 'amount_ars' => '1000', 'description' => 'Colectivo'])->assertCreated();
     }
+
+    public function test_turning_a_deposit_into_a_withdrawal_requotes_at_the_buy_rate(): void
+    {
+        $id = $this->ask(['type' => 'savings_deposit', 'amount_ars' => '11000'])->json('data.id');
+        $this->asAdmin();
+
+        // Deposit was quoted at the sell rate (1100); as a withdrawal it must use buy (1000).
+        $this->patchJson("/api/admin/operations/$id", ['type' => 'savings_withdrawal'])
+            ->assertOk()->assertJsonPath('data.exchange_rate', '1000.0000')->assertJsonPath('data.amount_usd', '11.00');
+        $this->assertSame('11.00', (string) $this->account()->reserved_usd);
+    }
+
+    public function test_reusing_an_id_for_a_different_request_is_refused(): void
+    {
+        $id = (string) Str::uuid();
+        $this->ask(['id' => $id, 'type' => 'savings_withdrawal', 'amount_ars' => '20000'])->assertCreated();
+
+        $this->ask(['id' => $id, 'type' => 'savings_withdrawal', 'amount_ars' => '30000'])->assertJsonValidationErrors('id');
+    }
+
+    public function test_dates_must_carry_a_time_zone_and_rates_must_be_realistic(): void
+    {
+        $this->asAdmin();
+        $url = "/api/admin/clients/{$this->membership->id}/operations";
+
+        $this->postJson($url, ['type' => 'expense', 'amount_ars' => '100', 'description' => 'x', 'occurred_at' => '2026-09-01'])->assertJsonValidationErrors('occurred_at');
+        $this->postJson($url, ['type' => 'expense', 'amount_ars' => '100', 'description' => 'x', 'occurred_at' => '1999-12-31T10:00:00Z'])->assertJsonValidationErrors('occurred_at');
+        $this->postJson($url, ['type' => 'savings_deposit', 'amount_ars' => '100000', 'exchange_rate' => '0.5'])->assertJsonValidationErrors('exchange_rate');
+        $this->postJson($url, ['type' => 'savings_deposit', 'amount_ars' => '0.01', 'exchange_rate' => '1000'])->assertJsonValidationErrors('amount_ars');
+        $this->postJson($url, ['type' => 'expense', 'amount_ars' => '100', 'description' => 'x', 'occurred_at' => '2026-09-01T10:00:00-03:00'])->assertCreated();
+    }
+
+    public function test_the_last_good_quote_is_used_when_the_rate_service_fails(): void
+    {
+        $this->ask(['type' => 'savings_deposit', 'amount_ars' => '1100'])->assertCreated();
+        Http::swap(new Factory);
+        Http::fake(['api.bluelytics.com.ar/*' => Http::response(null, 500)]);
+        cache()->forget('exchange_rates.latest');
+
+        $this->ask(['type' => 'savings_deposit', 'amount_ars' => '1100'])->assertCreated()->assertJsonPath('data.exchange_rate', '1100.0000');
+    }
 }

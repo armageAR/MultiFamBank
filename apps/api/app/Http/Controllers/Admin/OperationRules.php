@@ -13,14 +13,24 @@ final class OperationRules
         return ['numeric', 'decimal:0,2', 'min:0.01', 'max:999999999999.99'];
     }
 
+    /** Pesos per dollar. Below 1 is surely a typo (e.g. "1" instead of "1000"). */
     public static function rate(): array
     {
-        return ['numeric', 'decimal:0,4', 'gt:0', 'max:99999999.9999'];
+        return ['numeric', 'decimal:0,4', 'min:1', 'max:1000000'];
     }
 
+    /**
+     * A full timestamp with its offset ("2026-09-15T12:00:00.000Z"). A bare date would be read in
+     * UTC and could land on the previous day, and month, in the bank's timezone.
+     */
     public static function date(): array
     {
-        return ['date', 'before_or_equal:'.now()->addDay()->toIso8601String()];
+        return [
+            'regex:/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/',
+            'date',
+            'after_or_equal:2000-01-01',
+            'before_or_equal:'.now()->addDay()->toIso8601String(),
+        ];
     }
 
     public static function create(bool $withRate = false): array

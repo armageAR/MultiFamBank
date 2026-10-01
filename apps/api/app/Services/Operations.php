@@ -18,6 +18,7 @@ use App\Models\SavingsAccount;
 use App\Models\SavingsReservation;
 use App\Models\User;
 use App\Support\Money;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -32,6 +33,9 @@ use Illuminate\Support\Str;
  */
 class Operations
 {
+    /** Largest amount the decimal(14,2) money columns hold. */
+    private const MAX_USD = '999999999999.99';
+
     public function __construct(private ExchangeRates $rates) {}
 
     /**
@@ -45,11 +49,7 @@ class Operations
         $id = $input['id'] ?? (string) Str::uuid();
 
         if ($existing = MoneyRequest::find($id)) {
-            if ($existing->bank_membership_id !== $membership->id) {
-                throw new DomainRuleException('id', 'Ese identificador de pedido ya existe.');
-            }
-
-            return $existing;
+            return $this->replay($existing, $membership, $input);
         }
 
         $type = MoneyRequestType::from($input['type']);
@@ -59,36 +59,55 @@ class Operations
         // Fetched before the transaction: an external HTTP call must not hold row locks.
         $rate = $type === MoneyRequestType::Expense ? null : $this->quote($type);
 
-        return DB::transaction(function () use ($membership, $client, $input, $id, $type, $description, $rate) {
-            $this->lockWritableBank($membership->bank_id);
-            $membership = BankMembership::whereKey($membership->id)->firstOrFail();
+        try {
+            return DB::transaction(fn () => $this->createRequest($membership, $client, $input, $id, $type, $description, $rate), attempts: 3);
+        } catch (UniqueConstraintViolationException) {
+            // The same request arrived twice at the same moment (a retry); the first one won.
+            return $this->replay(MoneyRequest::findOrFail($id), $membership, $input);
+        }
+    }
 
-            if ($membership->status !== MembershipStatus::Active) {
-                throw new DomainRuleException('bank', 'Ya no sos cliente de este banco.');
-            }
+    private function createRequest(BankMembership $membership, User $client, array $input, string $id, MoneyRequestType $type, ?string $description, ?string $rate): MoneyRequest
+    {
+        $this->lockWritableBank($membership->bank_id);
+        $membership = $this->lockActiveMembership($membership, 'Ya no sos cliente de este banco.');
 
-            $request = MoneyRequest::create([
-                'id' => $id,
-                'bank_id' => $membership->bank_id,
-                'bank_membership_id' => $membership->id,
-                'type' => $type,
-                'requested_type' => $type,
-                'status' => MoneyRequestStatus::Pending,
-                'requested_amount_ars' => $input['amount_ars'],
-                'amount_ars' => $input['amount_ars'],
-                'requested_description' => $description,
-                'description' => $description,
-                'exchange_rate' => $rate,
-                'amount_usd' => $rate ? Money::arsToUsd($input['amount_ars'], $rate) : null,
-                'created_by' => $client->id,
-            ]);
+        $request = new MoneyRequest([
+            'id' => $id,
+            'bank_id' => $membership->bank_id,
+            'bank_membership_id' => $membership->id,
+            'type' => $type,
+            'requested_type' => $type,
+            'status' => MoneyRequestStatus::Pending,
+            'requested_amount_ars' => $input['amount_ars'],
+            'amount_ars' => $input['amount_ars'],
+            'requested_description' => $description,
+            'description' => $description,
+            'exchange_rate' => $rate,
+            'created_by' => $client->id,
+        ]);
+        $this->refreshUsd($request);
+        $request->save();
 
-            $this->reserveIfWithdrawal($request);
+        $this->reserveIfWithdrawal($request);
 
-            AuditLog::record('request.created', $request, $request->bank_id, null, $this->snapshot($request));
+        AuditLog::record('request.created', $request, $request->bank_id, null, $this->snapshot($request));
 
-            return $request;
-        }, attempts: 3);
+        return $request;
+    }
+
+    /** A retry with an id already used: the same request is returned, a different one is refused. */
+    private function replay(MoneyRequest $existing, BankMembership $membership, array $input): MoneyRequest
+    {
+        $same = $existing->bank_membership_id === $membership->id
+            && $existing->requested_type->value === $input['type']
+            && bccomp((string) $existing->requested_amount_ars, (string) $input['amount_ars'], 2) === 0;
+
+        if (! $same) {
+            throw new DomainRuleException('id', 'Ese identificador de pedido ya se usó para otro pedido.');
+        }
+
+        return $existing;
     }
 
     /**
@@ -98,6 +117,8 @@ class Operations
      */
     public function update(MoneyRequest $request, User $admin, array $changes): MoneyRequest
     {
+        $changes = $this->withQuoteForNewType($request, $changes);
+
         return DB::transaction(function () use ($request, $changes) {
             $this->lockWritableBank($request->bank_id);
             $request = $this->lockPending($request);
@@ -121,14 +142,21 @@ class Operations
      */
     public function confirm(MoneyRequest $request, User $admin, array $changes = []): MoneyRequest
     {
+        $changes = $this->withQuoteForNewType($request, $changes);
+
         return DB::transaction(function () use ($request, $admin, $changes) {
             $this->lockWritableBank($request->bank_id);
             $request = $this->lockPending($request);
             $before = $this->snapshot($request);
 
-            $this->releaseReservation($request, settle: true);
+            $reservation = $this->releaseReservation($request);
             $this->apply($request, $changes);
             $this->settle($request, $admin);
+
+            // The reserved dollars were paid out only if it is still a withdrawal.
+            if ($reservation && $request->type === MoneyRequestType::SavingsWithdrawal) {
+                $reservation->forceFill(['released_at' => null, 'settled_at' => now()])->save();
+            }
 
             AuditLog::record('request.confirmed', $request, $request->bank_id, $before, $this->snapshot($request));
 
@@ -186,10 +214,7 @@ class Operations
 
         return DB::transaction(function () use ($membership, $admin, $input, $type, $description) {
             $this->lockWritableBank($membership->bank_id);
-
-            if ($membership->fresh()->status !== MembershipStatus::Active) {
-                throw new DomainRuleException('bank', 'Esta persona ya no es cliente del banco.');
-            }
+            $membership = $this->lockActiveMembership($membership, 'Esta persona ya no es cliente del banco.');
 
             $request = new MoneyRequest([
                 'id' => (string) Str::uuid(),
@@ -292,13 +317,37 @@ class Operations
 
         if ($request->type === MoneyRequestType::Expense) {
             $request->exchange_rate = null;
-        } elseif ($request->exchange_rate === null) {
-            // E.g. an expense turned into a withdrawal: start from today's quote; the
-            // administrator can still adjust it.
-            $request->exchange_rate = $this->quote($request->type);
         }
 
         $this->refreshUsd($request);
+    }
+
+    /**
+     * When the administrator changes the type into a savings operation without giving a rate, the
+     * rate of the new type is quoted now (deposits blue sell, withdrawals blue buy), outside of any
+     * transaction so no row stays locked during the HTTP call.
+     */
+    private function withQuoteForNewType(MoneyRequest $request, array $changes): array
+    {
+        $newType = isset($changes['type']) ? MoneyRequestType::from($changes['type']) : null;
+
+        if ($newType && $newType !== MoneyRequestType::Expense && $newType !== $request->type && empty($changes['exchange_rate'])) {
+            $changes['exchange_rate'] = $this->quote($newType);
+        }
+
+        return $changes;
+    }
+
+    private function lockActiveMembership(BankMembership $membership, string $message): BankMembership
+    {
+        // Shared lock: a concurrent deactivation (FOR UPDATE) waits, or this sees it as removed.
+        $membership = BankMembership::whereKey($membership->id)->sharedLock()->firstOrFail();
+
+        if ($membership->status !== MembershipStatus::Active) {
+            throw new DomainRuleException('bank', $message);
+        }
+
+        return $membership;
     }
 
     private function quote(MoneyRequestType $type): string
@@ -322,7 +371,17 @@ class Operations
             throw new DomainRuleException('exchange_rate', 'Indicá la cotización para convertir a dólares.');
         }
 
-        $request->amount_usd = Money::arsToUsd((string) $request->amount_ars, (string) $request->exchange_rate);
+        $usd = Money::arsToUsd((string) $request->amount_ars, (string) $request->exchange_rate);
+
+        if (bccomp($usd, '0', 2) <= 0) {
+            throw new DomainRuleException('amount_ars', 'El monto es demasiado chico para convertirlo a dólares.');
+        }
+
+        if (Money::greaterThan($usd, self::MAX_USD)) {
+            throw new DomainRuleException('exchange_rate', 'El monto en dólares es demasiado grande. Revisá la cotización.');
+        }
+
+        $request->amount_usd = $usd;
     }
 
     private function account(MoneyRequest $request): SavingsAccount
@@ -347,21 +406,23 @@ class Operations
         $account->save();
     }
 
-    /** Gives back the reserved USD; on confirmation the reservation is marked settled instead. */
-    private function releaseReservation(MoneyRequest $request, bool $settle = false): void
+    /** Gives back the reserved USD and returns the reservation, if there was one. */
+    private function releaseReservation(MoneyRequest $request): ?SavingsReservation
     {
         $reservation = SavingsReservation::where('money_request_id', $request->id)
             ->whereNull('released_at')->whereNull('settled_at')->lockForUpdate()->first();
 
         if (! $reservation) {
-            return;
+            return null;
         }
 
         $account = $this->account($request);
         $account->reserved_usd = Money::sub((string) $account->reserved_usd, (string) $reservation->amount_usd);
         $account->save();
 
-        $reservation->forceFill([$settle ? 'settled_at' : 'released_at' => now()])->save();
+        $reservation->forceFill(['released_at' => now()])->save();
+
+        return $reservation;
     }
 
     /** Moves the money and writes the ledger entry; the request must not hold a live reservation. */
@@ -378,6 +439,10 @@ class Operations
                 $account->balance_usd = Money::sub((string) $account->balance_usd, $usd);
             } else {
                 $account->balance_usd = Money::add((string) $account->balance_usd, $usd);
+
+                if (Money::greaterThan((string) $account->balance_usd, self::MAX_USD)) {
+                    throw new DomainRuleException('amount_ars', 'El saldo resultante es demasiado grande.');
+                }
             }
 
             $account->save();

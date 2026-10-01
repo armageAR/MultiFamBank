@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\PushNotifications;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Password;
 use Laravel\Sanctum\Sanctum;
 use Mockery;
 use Tests\TestCase;
@@ -21,13 +22,13 @@ class PushNotificationsTest extends TestCase
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
-        $subscription = ['endpoint' => 'https://push.example.com/abc', 'keys' => ['p256dh' => 'key', 'auth' => 'auth']];
+        $subscription = ['endpoint' => 'https://fcm.googleapis.com/fcm/send/abc', 'keys' => ['p256dh' => 'key', 'auth' => 'auth']];
 
         $this->postJson('/api/push/subscriptions', $subscription)->assertOk();
         $this->postJson('/api/push/subscriptions', $subscription)->assertOk();
         $this->assertSame(1, PushSubscription::count());
 
-        $this->deleteJson('/api/push/subscriptions', ['endpoint' => 'https://push.example.com/abc'])->assertNoContent();
+        $this->deleteJson('/api/push/subscriptions', ['endpoint' => 'https://fcm.googleapis.com/fcm/send/abc'])->assertNoContent();
         $this->assertSame(0, PushSubscription::count());
     }
 
@@ -73,5 +74,29 @@ class PushNotificationsTest extends TestCase
 
         $this->assertSame([$admin->id, 'Nuevo pedido', 'Sofía pide un gasto de $ 15.000: Salida'], $sent[0]);
         $this->assertSame([$client->id, 'Pedido confirmado', 'Se confirmó un gasto de $ 12.000 (con cambios del administrador).'], $sent[1]);
+    }
+
+    public function test_only_known_push_services_can_be_registered(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        foreach (['http://169.254.169.254/latest', 'https://localhost:5432/x', 'https://evil.example.com/push', 'http://fcm.googleapis.com/x'] as $endpoint) {
+            $this->postJson('/api/push/subscriptions', ['endpoint' => $endpoint, 'keys' => ['p256dh' => 'k', 'auth' => 'a']])
+                ->assertJsonValidationErrors('endpoint');
+        }
+
+        $this->postJson('/api/push/subscriptions', ['endpoint' => 'https://web.push.apple.com/abc', 'keys' => ['p256dh' => 'k', 'auth' => 'a']])->assertOk();
+        $this->postJson('/api/push/subscriptions', ['endpoint' => 'https://wns2-par02p.notify.windows.com/w/?token=x', 'keys' => ['p256dh' => 'k', 'auth' => 'a']])->assertOk();
+    }
+
+    public function test_resetting_the_password_stops_notifications_to_old_devices(): void
+    {
+        $user = User::factory()->create();
+        $user->pushSubscriptions()->create(['endpoint' => 'https://fcm.googleapis.com/x', 'endpoint_hash' => hash('sha256', 'https://fcm.googleapis.com/x'), 'public_key' => 'k', 'auth_token' => 'a']);
+        $token = Password::broker()->createToken($user);
+
+        $this->postJson('/api/auth/reset-password', ['token' => $token, 'email' => $user->email, 'password' => 'clave-nueva-1', 'password_confirmation' => 'clave-nueva-1'])->assertOk();
+
+        $this->assertSame(0, $user->pushSubscriptions()->count());
     }
 }

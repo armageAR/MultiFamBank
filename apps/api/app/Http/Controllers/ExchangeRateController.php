@@ -11,7 +11,8 @@ class ExchangeRateController extends Controller
 {
     public function show(Request $request, ExchangeRates $rates): JsonResponse
     {
-        if ($request->boolean('refresh')) {
+        // Only administrators may force a fresh quote; everyone shares the cached one.
+        if ($request->boolean('refresh') && ($request->user()->is_superadmin || $request->user()->accessibleAdministeredBank()->exists())) {
             $rates->forget();
         }
 

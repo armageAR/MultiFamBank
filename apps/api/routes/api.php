@@ -22,10 +22,12 @@ Route::get('/health', HealthController::class);
 Route::get('/push/public-key', [PushSubscriptionController::class, 'publicKey']);
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/exchange-rates', [ExchangeRateController::class, 'show']);
-    Route::post('/push/subscriptions', [PushSubscriptionController::class, 'store']);
-    Route::delete('/push/subscriptions', [PushSubscriptionController::class, 'destroy']);
-    Route::post('/push/test', [PushSubscriptionController::class, 'test']);
+    Route::get('/exchange-rates', [ExchangeRateController::class, 'show'])->middleware('throttle:30,1');
+    Route::middleware('throttle:10,1')->group(function () {
+        Route::post('/push/subscriptions', [PushSubscriptionController::class, 'store']);
+        Route::delete('/push/subscriptions', [PushSubscriptionController::class, 'destroy']);
+        Route::post('/push/test', [PushSubscriptionController::class, 'test']);
+    });
 });
 
 Route::prefix('auth')->group(function () {
@@ -68,7 +70,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', EnsureBankAdmin::class])->gr
     Route::delete('/clients/invitations/{invitation}', [AdminClientController::class, 'revokeInvitation']);
     Route::patch('/clients/{membership}', [AdminClientController::class, 'update']);
     Route::put('/clients/{membership}/password', [AdminClientController::class, 'setPassword']);
-    Route::post('/clients/{membership}/password-reset', [AdminClientController::class, 'sendPasswordReset']);
+    Route::post('/clients/{membership}/password-reset', [AdminClientController::class, 'sendPasswordReset'])->middleware('throttle:5,1');
     Route::post('/clients/{membership}/deactivate', [AdminClientController::class, 'deactivate']);
     Route::post('/clients/{membership}/reactivate', [AdminClientController::class, 'reactivate']);
     Route::get('/clients/{membership}/operations', [AdminClientController::class, 'operations']);

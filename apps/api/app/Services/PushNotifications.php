@@ -12,6 +12,35 @@ use Throwable;
 /** Web Push delivery, ported from FamBank: high urgency, kept by the push service for a day. */
 class PushNotifications
 {
+    /** Browser push services. Only these endpoints are stored, so the server never calls arbitrary URLs. */
+    private const PUSH_HOSTS = [
+        'fcm.googleapis.com',
+        'updates.push.services.mozilla.com',
+        'web.push.apple.com',
+    ];
+
+    private const PUSH_HOST_SUFFIXES = ['.push.services.mozilla.com', '.notify.windows.com', '.push.apple.com'];
+
+    public static function isKnownPushService(string $endpoint): bool
+    {
+        $parts = parse_url($endpoint);
+
+        if (($parts['scheme'] ?? null) !== 'https' || isset($parts['port']) || ! isset($parts['host'])) {
+            return false;
+        }
+
+        $host = strtolower($parts['host']);
+
+        return in_array($host, self::PUSH_HOSTS, true)
+            || collect(self::PUSH_HOST_SUFFIXES)->contains(fn ($suffix) => str_ends_with($host, $suffix));
+    }
+
+    /** Signing out of everywhere (password or email change) also stops this person's notifications. */
+    public function forget(User $user): void
+    {
+        $user->pushSubscriptions()->delete();
+    }
+
     public function configured(): bool
     {
         return filled(config('services.webpush.public_key')) && filled(config('services.webpush.private_key'));
@@ -40,6 +69,10 @@ class PushNotifications
         );
 
         foreach ($subscriptions as $subscription) {
+            if (! self::isKnownPushService($subscription->endpoint)) {
+                continue;
+            }
+
             $webPush->queueNotification(
                 Subscription::create([
                     'endpoint' => $subscription->endpoint,
@@ -60,6 +93,7 @@ class PushNotifications
 
             $result['failed']++;
             $result['errors'][] = $report->getReason();
+            Log::warning('Push delivery failed', ['user_id' => $user->id, 'reason' => $report->getReason()]);
 
             // The browser dropped the subscription: forget it.
             if ($report->isSubscriptionExpired()) {
