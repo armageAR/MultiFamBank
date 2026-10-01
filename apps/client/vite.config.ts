@@ -15,6 +15,11 @@ export default defineConfig(({ mode }) => {
       environmentBranding(environment, 'emerald'),
       VitePWA({
         registerType: 'autoUpdate',
+        // Custom worker (src/sw.ts) so it can show push notifications.
+        strategies: 'injectManifest',
+        srcDir: 'src',
+        filename: 'sw.ts',
+        injectManifest: { globPatterns: ['**/*.{js,css,html,svg,webmanifest}'] },
         manifest: {
           id: '/client/',
           name: `${label ? `[${label}] ` : ''}MultiFamBank · Mi banco`,
@@ -26,7 +31,6 @@ export default defineConfig(({ mode }) => {
           background_color: '#f8fafc',
           icons: [{ src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
         },
-        workbox: { navigateFallback: '/index.html' },
       }),
     ],
     server: { port: 5173, strictPort: true },

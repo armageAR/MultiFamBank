@@ -92,3 +92,120 @@ export interface AdminBank {
   status: BankStatus
   activated_at: string | null
 }
+
+// ── Operations ────────────────────────────────────────────────────────────────
+
+export type OperationType = 'savings_deposit' | 'savings_withdrawal' | 'expense'
+export type OperationStatus = 'pending' | 'confirmed' | 'rejected' | 'canceled'
+
+export interface Operation {
+  id: string
+  type: OperationType
+  funding_source: 'client_savings' | 'bank_funds'
+  status: OperationStatus
+  amount_ars: string
+  exchange_rate: string | null
+  amount_usd: string | null
+  description: string | null
+  occurred_at: string | null
+  created_at: string
+  confirmed_at: string | null
+  rejected_at: string | null
+  rejection_reason: string | null
+  canceled_at: string | null
+  requested: { type: OperationType; amount_ars: string; description: string | null }
+  changed_by_admin: boolean
+  recorded_by_admin: boolean
+  client: { membership_id: number; name: string } | null
+}
+
+export interface Paginated<T> {
+  data: T[]
+  meta: { current_page: number; last_page: number; per_page: number; total: number }
+}
+
+export interface OperationEdit {
+  type?: OperationType
+  amount_ars?: string
+  description?: string | null
+  occurred_at?: string | null
+  exchange_rate?: string | null
+}
+
+export interface NewOperation {
+  type: OperationType
+  amount_ars: string
+  description?: string | null
+  exchange_rate?: string | null
+  occurred_at?: string | null
+}
+
+export interface ExchangeRates {
+  blue: { buy: string; sell: string }
+  oficial: { buy: string; sell: string }
+  fetched_at: string
+}
+
+// ── Bank administration ───────────────────────────────────────────────────────
+
+export interface AdminClient {
+  membership_id: number
+  name: string
+  email: string
+  status: 'active' | 'removed'
+  member_since: string
+  last_seen_at: string | null
+  balance_usd: string
+  reserved_usd: string
+  available_usd: string
+  pending_requests: number
+  manageable: boolean
+}
+
+export interface ClientInvitation {
+  id: number
+  email: string
+  name: string
+  state: InvitationState
+  expires_at: string
+  last_sent_at: string | null
+}
+
+export interface InvitationResult {
+  data: ClientInvitation
+  email_sent: boolean
+  invitation_url: string | null
+}
+
+export interface AdminDashboard {
+  balance_usd: string
+  reserved_usd: string
+  available_usd: string
+  clients: number
+  pending_requests: number
+  month: string
+  month_expenses_ars: string
+  exchange_rates: ExchangeRates | null
+}
+
+export interface ExpenseReport {
+  month: string
+  timezone: string
+  total_ars: string
+  by_client: {
+    membership_id: number
+    name: string
+    total_ars: string
+    expenses: { money_request_id: string; occurred_at: string; amount_ars: string; description: string | null }[]
+  }[]
+  savings: { deposits_ars: string; deposits_usd: string; withdrawals_ars: string; withdrawals_usd: string }
+}
+
+// ── Client ────────────────────────────────────────────────────────────────────
+
+export interface ClientBank {
+  bank: { id: number; name: string | null; status: BankStatus }
+  balance_usd: string
+  reserved_usd: string
+  available_usd: string
+}
