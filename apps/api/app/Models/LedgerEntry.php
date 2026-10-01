@@ -38,6 +38,11 @@ class LedgerEntry extends Model
         return $this->belongsTo(Bank::class);
     }
 
+    public function membership(): BelongsTo
+    {
+        return $this->belongsTo(BankMembership::class, 'bank_membership_id');
+    }
+
     public function moneyRequest(): BelongsTo
     {
         return $this->belongsTo(MoneyRequest::class);

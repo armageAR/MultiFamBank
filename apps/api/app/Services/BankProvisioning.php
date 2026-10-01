@@ -140,6 +140,7 @@ class BankProvisioning
                         // They sign in with the new address from now on; invitations still pending for the
                         // old one follow the identity so accepting them cannot create a second user.
                         $admin->tokens()->delete();
+                        app(PushNotifications::class)->forget($admin);
                         Invitation::where('email', $previous['email'])
                             ->whereNull('accepted_at')
                             ->whereNull('revoked_at')
@@ -194,6 +195,7 @@ class BankProvisioning
 
             $admin->forceFill(['password' => Hash::make($password)])->save();
             $admin->tokens()->delete();
+            app(PushNotifications::class)->forget($admin);
             // An unused reset link must not override the password just set.
             Password::broker()->deleteToken($admin);
 

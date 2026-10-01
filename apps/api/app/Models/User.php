@@ -70,6 +70,11 @@ class User extends Authenticatable
         return $this->administeredBank()->where('status', '!=', BankStatus::Deactivated);
     }
 
+    public function pushSubscriptions(): HasMany
+    {
+        return $this->hasMany(PushSubscription::class);
+    }
+
     /** @return HasMany<BankMembership, $this> */
     public function memberships(): HasMany
     {
