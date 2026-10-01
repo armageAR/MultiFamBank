@@ -3,7 +3,7 @@ import { defineRailway, github, postgres, preserve, project, service, volume } f
 const region = "us-east4-eqdc4a";
 
 // Frontends build from the repo root so they can resolve the pnpm workspace packages.
-function frontend(name: "client" | "admin" | "superadmin", repo: ReturnType<typeof github>) {
+function frontend(name: "client" | "admin" | "superadmin", repo: ReturnType<typeof github>, environment: "production" | "staging") {
   return service(name, {
     source: repo,
     replicas: { [region]: 1 },
@@ -15,6 +15,8 @@ function frontend(name: "client" | "admin" | "superadmin", repo: ReturnType<type
       RAILPACK_NODE_VERSION: "22",
       RAILPACK_SPA_OUTPUT_DIR: `apps/${name}/dist`,
       VITE_API_URL: "https://${{api.RAILWAY_PUBLIC_DOMAIN}}",
+      // Non-production builds get a red "S" favicon and a STAGING marker in the UI.
+      VITE_APP_ENV: environment,
     },
   });
 }
@@ -22,7 +24,8 @@ function frontend(name: "client" | "admin" | "superadmin", repo: ReturnType<type
 export default defineRailway((ctx) => {
   // Trunk-based flow: main deploys to staging; production only receives fast-forwards of main.
   // checkSuites makes Railway wait for GitHub CI to pass before deploying a commit.
-  const branch = ctx.isEnvironment("production") ? "production" : "main";
+  const environment = ctx.isEnvironment("production") ? "production" : "staging";
+  const branch = environment === "production" ? "production" : "main";
   const repo = github("armageAR/MultiFamBank", { branch, checkSuites: true });
 
   const Postgres = postgres("Postgres", { region });
@@ -70,7 +73,7 @@ export default defineRailway((ctx) => {
     },
   });
 
-  const services = [api, Postgres, frontend("client", repo), frontend("admin", repo), frontend("superadmin", repo)];
+  const services = [api, Postgres, frontend("client", repo, environment), frontend("admin", repo, environment), frontend("superadmin", repo, environment)];
 
   // Staging sleeps when idle (Railway Serverless) and wakes on the first request.
   if (!ctx.isEnvironment("production")) {

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#1e3a8a"/>
+  <path d="M32 9 7 22v5h50v-5L32 9z" fill="#fff"/>
+  <rect x="12" y="29" width="6" height="18" rx="1" fill="#fff"/>
+  <rect x="23" y="29" width="6" height="18" rx="1" fill="#fff"/>
+  <rect x="35" y="29" width="6" height="18" rx="1" fill="#fff"/>
+  <rect x="46" y="29" width="6" height="18" rx="1" fill="#fff"/>
+  <rect x="8" y="49" width="48" height="6" rx="1.5" fill="#fff"/>
+  <!-- Staging marker: a large red S over the whole icon, outlined so it reads on any tab color. -->
+  <text x="32" y="56" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="66" font-weight="900"
+    fill="#dc2626" stroke="#fff" stroke-width="5" stroke-linejoin="round" paint-order="stroke">S</text>
+</svg>
