@@ -12,7 +12,10 @@ function shift(month: string, delta: number): string {
 }
 
 const currentMonth = () => shift(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`, 0)
-const label = (month: string) => new Date(`${month}-15T12:00:00`).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+const label = (month: string) => {
+  const text = new Date(`${month}-15T12:00:00`).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
 
 /** Bank-funded expenses of a month, by client; the clients' own savings movements are shown apart. */
 export function ReportTab() {
@@ -26,7 +29,7 @@ export function ReportTab() {
         <button type="button" onClick={() => setMonth(shift(month, -1))} className="rounded-lg px-3 py-2 text-sm text-gray-500 hover:text-gray-900" aria-label="Mes anterior">
           ‹
         </button>
-        <p className="text-sm font-semibold text-gray-900 capitalize">{label(month)}</p>
+        <p className="text-sm font-semibold text-gray-900">{label(month)}</p>
         <button
           type="button"
           onClick={() => setMonth(shift(month, 1))}

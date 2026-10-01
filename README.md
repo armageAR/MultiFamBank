@@ -4,7 +4,7 @@ MultiFamBank is the next version of [FamBank](https://github.com/armageAR/famban
 
 Each family operates an independent **bank**, with its own administrator, clients, savings accounts, requests, and expense reports. Clients can belong to multiple banks, while a person can administer only one bank.
 
-> **Project status:** The monorepo is deployed to Railway. Implemented so far: the full database schema, sign-in and password reset, the platform superadmin application (bank list, bank creation with an administrator invitation, invitation resend, a bank detail view to manage the administrator and see clients, and pausing, deactivating, and reactivating banks), and invitation acceptance plus bank setup in the administrator application. Client features, requests, confirmations, and reports are planned, not implemented yet. The original FamBank repository contains the first working version.
+> **Project status:** The monorepo is deployed to Railway. Implemented: the full database schema; sign-in and password reset; the platform superadmin application (banks, administrator invitations and management, pause/deactivate/reactivate); the bank administrator application (dashboard with balances and quotes, client invitations and management, pending requests with edit/confirm/reject, operations recorded on a client's behalf, per-client history with date changes, monthly expense report, push notifications, read-only offline); and a first version of the client application (accept invitation, balance, deposit/withdrawal/expense requests, history, cancel, push notifications). Offline request preparation in the client application is planned, not implemented yet. The original FamBank repository contains the first working version.
 
 In this project, “bank” means a private family ledger. MultiFamBank does not hold money, transfer funds, execute currency exchange, or provide banking services. Administrators record money received or delivered outside the application.
 
@@ -324,6 +324,15 @@ Invitations and password resets are Laravel mailables and notifications. Deliver
 While `MAIL_MAILER=log` (the current setting, as in the original FamBank), emails are written to the logs and the API returns each new invitation link to the superadmin application, which shows it for manual sharing. To deliver real emails, in `.railway/railway.ts` set `MAIL_MAILER` to `"resend"`, add `RESEND_API_KEY: preserve()`, set the key with `railway variable set RESEND_API_KEY=... --service api`, and use a sender on a domain verified in Resend (`MAIL_FROM_ADDRESS`). Invitation links are no longer exposed once a real mailer is configured.
 
 With `log`, password reset links also end up in the logs, so anyone with access to the Railway logs could reset any account, including the superadmin's. That is acceptable only while there are no real users; switch to Resend before inviting real families.
+
+### Push notifications
+
+Web Push works as in the original FamBank (VAPID, high urgency, kept by the push service for a day). Each Railway environment has its own key pair in `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` (generate with `php artisan push:vapid-keys`). Notifications are sent after the HTTP response:
+
+- The bank administrator gets one when a client creates a request.
+- The client gets one when a request is confirmed (mentioning changes made by the administrator) or rejected, when the administrator records an operation for them, and when the date of a confirmed operation changes.
+
+Only HTTPS endpoints of known browser push services are accepted. Signing out removes the device's subscription; password resets, passwords set by an administrator, and email changes remove all of the person's subscriptions.
 
 ## Multi-tenant data model
 

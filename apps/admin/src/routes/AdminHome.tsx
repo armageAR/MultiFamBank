@@ -2,7 +2,7 @@ import { fetchPendingOperations, toApiError, type Operation } from '@multifamban
 import { useAuth, useOnline } from '@multifambank/auth'
 import { Alert, AuthLayout, Button, FamilyShell, HeaderButton } from '@multifambank/ui'
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { api } from '../api'
 import { ClientsTab } from '../components/ClientsTab'
@@ -30,18 +30,24 @@ export function AdminHome() {
   const bank = user?.administered_bank
   const pending = useQuery({ queryKey: keys.pending, queryFn: () => fetchPendingOperations(api), enabled: Boolean(bank), refetchInterval: 60_000 })
 
-  // A push notification opens "/?pedido=<id>": review that request directly.
-  const requested = params.get('pedido')
-  useEffect(() => {
-    if (!requested || !pending.data) return
-    const match = pending.data.find((operation) => operation.id === requested)
-    if (match) setReviewing(match)
-    setParams((prev) => {
-      const next = new URLSearchParams(prev)
-      next.delete('pedido')
-      return next
-    }, { replace: true })
-  }, [requested, pending.data, setParams])
+  // A push notification opens "/?pedido=<id>": that request is reviewed directly.
+  const linkedId = params.get('pedido')
+  const linked = linkedId ? pending.data?.find((operation) => operation.id === linkedId) : undefined
+  const current = reviewing ?? linked ?? null
+
+  function closeReview() {
+    setReviewing(null)
+    if (linkedId) {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('pedido')
+          return next
+        },
+        { replace: true },
+      )
+    }
+  }
 
   if (isLoading) return <p className="p-6 text-center text-sm text-gray-500">Cargando…</p>
   if (!user) return <Navigate to="/ingresar" replace />
@@ -126,7 +132,7 @@ export function AdminHome() {
         </p>
       )}
 
-      {reviewing && <ReviewModal operation={reviewing} onClose={() => setReviewing(null)} />}
+      {current && <ReviewModal operation={current} onClose={closeReview} />}
     </FamilyShell>
   )
 }

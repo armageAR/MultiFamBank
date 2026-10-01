@@ -4,8 +4,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api'
 import { keys } from '../queries'
 
-const monthName = (month: string) =>
-  new Date(`${month}-15T12:00:00`).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+const monthName = (month: string) => {
+  const text = new Date(`${month}-15T12:00:00`).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
 
 function Quote({ label, value }: { label: string; value: string }) {
   return (
@@ -58,7 +60,7 @@ export function DashboardTab() {
       <div className="grid grid-cols-2 gap-3">
         <Card title="Gastos del banco">
           <p className="text-xl font-bold text-gray-900">{formatArs(data.month_expenses_ars)}</p>
-          <p className="mt-1 text-xs text-gray-500 capitalize">{monthName(data.month)}</p>
+          <p className="mt-1 text-xs text-gray-500">{monthName(data.month)}</p>
         </Card>
         <Card title="Clientes">
           <p className="text-xl font-bold text-gray-900">{data.clients}</p>

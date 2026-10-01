@@ -14,7 +14,8 @@ import { useState, type FormEvent } from 'react'
 import { api } from '../api'
 import { localToIso, parseAmount } from '../amounts'
 import { useExchangeRates, useRefreshAdminData } from '../queries'
-import { OperationFields, suggestedRate, type OperationDraft } from './OperationFields'
+import { suggestedRate, type OperationDraft } from '../operationDraft'
+import { OperationFields } from './OperationFields'
 
 function ErrorBanner({ error, fields }: { error: ApiError | null; fields: string[] }) {
   if (!error || fields.some((field) => error.fields[field])) return null

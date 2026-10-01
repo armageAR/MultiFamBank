@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { api } from '../api'
 import { localToIso, parseAmount } from '../amounts'
 import { useExchangeRates, useRefreshAdminData } from '../queries'
-import { OperationFields, type OperationDraft } from './OperationFields'
+import { type OperationDraft } from '../operationDraft'
+import { OperationFields } from './OperationFields'
 
 /** Everything about a pending request can change before confirming: type, amount, comment, date and rate. */
 export function ReviewModal({ operation, onClose }: { operation: Operation; onClose: () => void }) {

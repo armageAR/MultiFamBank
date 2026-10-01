@@ -1,4 +1,4 @@
-import { AuthProvider, createOfflineQueryClient, ForgotPasswordPage, LoginPage, ResetPasswordPage } from '@multifambank/auth'
+import { AcceptInvitationPage, AuthProvider, createOfflineQueryClient, ForgotPasswordPage, LoginPage, ResetPasswordPage } from '@multifambank/auth'
 import { LookProvider } from '@multifambank/ui'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { StrictMode } from 'react'
@@ -6,7 +6,6 @@ import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router'
 import { api, tokenStore } from './api'
 import './index.css'
-import { AcceptInvitation } from './routes/AcceptInvitation'
 import { AdminHome } from './routes/AdminHome'
 import { BankSetup } from './routes/BankSetup'
 
@@ -17,7 +16,18 @@ const router = createBrowserRouter([
   { path: '/ingresar', element: <LoginPage appName="Administración" api={api} /> },
   { path: '/olvide-contrasena', element: <ForgotPasswordPage appName="Administración" api={api} /> },
   { path: '/restablecer-contrasena', element: <ResetPasswordPage appName="Administración" api={api} /> },
-  { path: '/invitacion/:token', element: <AcceptInvitation /> },
+  {
+    path: '/invitacion/:token',
+    element: (
+      <AcceptInvitationPage
+        appName="Administración"
+        api={api}
+        next="/configurar-banco"
+        title="Administrar un banco"
+        intro={() => 'Te invitaron a administrar un banco familiar en MultiFamBank.'}
+      />
+    ),
+  },
   { path: '/configurar-banco', element: <BankSetup /> },
   { path: '/', element: <AdminHome /> },
 ])
