@@ -35,7 +35,11 @@ export interface PlatformBank {
   } | null
   created_at: string
   activated_at: string | null
+  paused_at: string | null
+  deactivated_at: string | null
 }
+
+export type BankLifecycleAction = 'pause' | 'resume' | 'deactivate' | 'reactivate'
 
 export interface PlatformBankClient {
   id: number

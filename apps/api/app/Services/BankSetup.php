@@ -20,6 +20,10 @@ class BankSetup
                 throw new DomainRuleException('bank', 'El banco está desactivado.');
             }
 
+            if ($bank->status === BankStatus::Paused) {
+                throw new DomainRuleException('bank', 'Las operaciones del banco están pausadas. Comunicate con el administrador de la plataforma.');
+            }
+
             $old = $bank->only(['name', 'timezone', 'status']);
             $bank->fill(['name' => $name, 'timezone' => $timezone]);
 

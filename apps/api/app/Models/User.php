@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\BankStatus;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -61,6 +62,12 @@ class User extends Authenticatable
     public function administeredBank(): HasOne
     {
         return $this->hasOne(Bank::class, 'admin_user_id');
+    }
+
+    /** The administered bank as its administrator sees it: a deactivated bank does not exist for them. */
+    public function accessibleAdministeredBank(): HasOne
+    {
+        return $this->administeredBank()->where('status', '!=', BankStatus::Deactivated);
     }
 
     /** @return HasMany<BankMembership, $this> */

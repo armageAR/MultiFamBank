@@ -1,5 +1,5 @@
 import { useAuth } from '@multifambank/auth'
-import { AppShell, AuthLayout, BankStatusBadge, Button, Card } from '@multifambank/ui'
+import { Alert, AppShell, AuthLayout, BankStatusBadge, Button, Card } from '@multifambank/ui'
 import { Link, Navigate } from 'react-router'
 
 export function BankHome() {
@@ -37,12 +37,20 @@ export function BankHome() {
       }
     >
       <div className="space-y-4">
+        {bank.status === 'paused' && (
+          <Alert tone="warning" title="Las operaciones del banco están pausadas">
+            Podés ver la información del banco, pero no hacer cambios ni confirmar operaciones. Comunicate con el administrador de la
+            plataforma.
+          </Alert>
+        )}
         <Card title="Estado">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <BankStatusBadge status={bank.status} />
-            <Link to="/configurar-banco" className="text-sm text-brand-700 hover:underline">
-              Editar datos del banco
-            </Link>
+            {bank.status === 'active' && (
+              <Link to="/configurar-banco" className="text-sm text-brand-700 hover:underline">
+                Editar datos del banco
+              </Link>
+            )}
           </div>
         </Card>
         <Card title="Próximamente">

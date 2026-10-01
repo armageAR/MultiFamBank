@@ -11,7 +11,7 @@ class EnsureBankAdmin
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $bank = $request->user()?->administeredBank;
+        $bank = $request->user()?->accessibleAdministeredBank;
         abort_unless($bank !== null, 403, 'No administrás ningún banco.');
 
         $request->attributes->set('bank', $bank);

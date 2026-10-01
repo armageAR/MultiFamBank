@@ -30,13 +30,15 @@ class BankSetupTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['action' => 'bank.configured', 'bank_id' => $bank->id, 'actor_user_id' => $admin->id]);
     }
 
-    public function test_editing_a_paused_bank_keeps_it_paused(): void
+    public function test_a_paused_bank_is_read_only(): void
     {
         $admin = User::factory()->create();
-        Bank::create(['name' => 'X', 'admin_email' => $admin->email, 'admin_user_id' => $admin->id, 'status' => BankStatus::Paused]);
+        $bank = Bank::create(['name' => 'X', 'admin_email' => $admin->email, 'admin_user_id' => $admin->id, 'status' => BankStatus::Paused]);
         Sanctum::actingAs($admin);
 
-        $this->putJson('/api/admin/bank', ['name' => 'Y', 'timezone' => 'UTC'])->assertJsonPath('data.status', 'paused');
+        $this->getJson('/api/admin/bank')->assertOk()->assertJsonPath('data.status', 'paused');
+        $this->putJson('/api/admin/bank', ['name' => 'Y', 'timezone' => 'UTC'])->assertJsonValidationErrors('bank');
+        $this->assertSame('X', $bank->fresh()->name);
     }
 
     public function test_only_the_bank_administrator_can_configure_it(): void

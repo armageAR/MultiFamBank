@@ -11,7 +11,7 @@ class UserResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $bank = $this->administeredBank;
+        $bank = $this->accessibleAdministeredBank;
 
         return [
             'id' => $this->id,

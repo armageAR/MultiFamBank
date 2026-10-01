@@ -2,6 +2,7 @@ import type { AxiosInstance } from 'axios'
 import type {
   AdminBank,
   AuthResponse,
+  BankLifecycleAction,
   BankStatus,
   CreateBankResponse,
   HealthResponse,
@@ -83,6 +84,16 @@ export async function updatePlatformBankAdmin(
 ): Promise<UpdateAdminResponse> {
   const { data } = await client.patch<UpdateAdminResponse>(`/platform/banks/${bankId}/admin`, input)
   return data
+}
+
+/** Pause, resume, deactivate or reactivate a bank. */
+export async function changePlatformBankStatus(
+  client: AxiosInstance,
+  bankId: number,
+  action: BankLifecycleAction,
+): Promise<PlatformBankDetail> {
+  const { data } = await client.post<{ data: PlatformBankDetail }>(`/platform/banks/${bankId}/status`, { action })
+  return data.data
 }
 
 /** The superadmin chooses the password; the administrator is signed out everywhere. */
