@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
-      environmentBranding(environment),
+      environmentBranding(environment, 'emerald'),
       VitePWA({
         registerType: 'autoUpdate',
         manifest: {
@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
           lang: 'es',
           start_url: '/',
           display: 'standalone',
-          theme_color: '#14532d',
+          theme_color: '#ffffff',
           background_color: '#f8fafc',
           icons: [{ src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
         },

@@ -2,6 +2,7 @@
 
 namespace App\Enums;
 
+/** Derived from MoneyRequestType; not stored. */
 enum FundingSource: string
 {
     case ClientSavings = 'client_savings';

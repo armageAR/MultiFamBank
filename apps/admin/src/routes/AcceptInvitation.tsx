@@ -19,7 +19,7 @@ export function AcceptInvitation() {
   if (invitation.isPending) {
     return (
       <AuthLayout appName="Administración" title="Invitación">
-        <p className="text-center text-slate-500">Cargando invitación…</p>
+        <p className="text-center text-sm text-gray-500">Cargando invitación…</p>
       </AuthLayout>
     )
   }
@@ -41,7 +41,7 @@ export function AcceptInvitation() {
         {details.state === 'accepted' ? (
           <div className="space-y-4">
             <Alert tone="info">Esta invitación ya fue aceptada.</Alert>
-            <Link to="/ingresar" className="block text-center text-sm text-brand-700 hover:underline">
+            <Link to="/ingresar" className="block text-center text-sm text-emerald-600 hover:underline">
               Ir a ingresar
             </Link>
           </div>
@@ -92,17 +92,17 @@ function AcceptForm({ token, details }: { token: string; details: InvitationDeta
   return (
     <AuthLayout appName="Administración" title="Administrar un banco">
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        <p className="text-sm text-slate-700">Te invitaron a administrar un banco familiar en MultiFamBank.</p>
-        <p className="text-sm text-slate-600">Vence: {expiryFormat.format(new Date(details.expires_at))}</p>
-        <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm">
-          Email: <strong className="break-all">{details.email}</strong>
+        <p className="text-sm text-gray-700">Te invitaron a administrar un banco familiar en MultiFamBank.</p>
+        <p className="text-xs text-gray-500">Vence: {expiryFormat.format(new Date(details.expires_at))}</p>
+        <p className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-700">
+          Email: <strong className="break-all text-gray-900">{details.email}</strong>
         </p>
 
         {general && <Alert tone="error">{general}</Alert>}
 
         {details.has_account ? (
           <>
-            <p className="text-sm text-slate-600">Ya tenés una cuenta en MultiFamBank. Ingresá tu contraseña actual para aceptar.</p>
+            <p className="text-xs text-gray-500">Ya tenés una cuenta en MultiFamBank. Ingresá tu contraseña actual para aceptar.</p>
             <TextField
               label="Contraseña"
               type="password"

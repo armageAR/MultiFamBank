@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\FundingSource;
 use App\Enums\MoneyRequestStatus;
 use App\Enums\MoneyRequestType;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -19,15 +18,15 @@ class MoneyRequest extends Model
         'bank_id',
         'bank_membership_id',
         'type',
+        'requested_type',
         'status',
-        'requested_funding_source',
         'requested_amount_ars',
-        'funding_source',
+        'requested_description',
         'amount_ars',
         'exchange_rate',
         'amount_usd',
-        'category',
         'description',
+        'occurred_at',
         'created_by',
         'confirmed_at',
         'confirmed_by',
@@ -42,8 +41,7 @@ class MoneyRequest extends Model
         return [
             'type' => MoneyRequestType::class,
             'status' => MoneyRequestStatus::class,
-            'requested_funding_source' => FundingSource::class,
-            'funding_source' => FundingSource::class,
+            'requested_type' => MoneyRequestType::class,
             'requested_amount_ars' => 'decimal:2',
             'amount_ars' => 'decimal:2',
             'exchange_rate' => 'decimal:4',
@@ -51,6 +49,7 @@ class MoneyRequest extends Model
             'confirmed_at' => 'datetime',
             'rejected_at' => 'datetime',
             'canceled_at' => 'datetime',
+            'occurred_at' => 'datetime',
         ];
     }
 

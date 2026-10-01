@@ -17,7 +17,6 @@ class LedgerEntry extends Model
         'amount_ars',
         'exchange_rate',
         'amount_usd',
-        'category',
         'description',
         'occurred_at',
         'created_by',
