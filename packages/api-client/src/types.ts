@@ -37,6 +37,27 @@ export interface PlatformBank {
   activated_at: string | null
 }
 
+export interface PlatformBankClient {
+  id: number
+  name: string
+  email: string
+  status: 'active' | 'removed'
+  member_since: string
+  last_seen_at: string | null
+}
+
+export interface PlatformBankDetail extends PlatformBank {
+  admin: PlatformBank['admin'] & { last_seen_at: string | null }
+  clients: PlatformBankClient[]
+}
+
+export interface UpdateAdminResponse {
+  data: PlatformBankDetail
+  /** Set when a pending administrator's email changed and a new invitation was issued. */
+  email_sent: boolean | null
+  invitation_url: string | null
+}
+
 export interface PlatformBankList {
   data: PlatformBank[]
   counts: Record<BankStatus, number>

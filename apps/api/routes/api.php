@@ -33,6 +33,9 @@ Route::prefix('invitations/{token}')->middleware('throttle:auth')->group(functio
 Route::prefix('platform')->middleware(['auth:sanctum', EnsureSuperadmin::class])->group(function () {
     Route::get('/banks', [PlatformBankController::class, 'index']);
     Route::post('/banks', [PlatformBankController::class, 'store']);
+    Route::get('/banks/{bank}', [PlatformBankController::class, 'show']);
+    Route::patch('/banks/{bank}/admin', [PlatformBankController::class, 'updateAdmin']);
+    Route::put('/banks/{bank}/admin/password', [PlatformBankController::class, 'setAdminPassword']);
     Route::post('/banks/{bank}/admin-invitation', [PlatformBankController::class, 'resendInvitation']);
 });
 

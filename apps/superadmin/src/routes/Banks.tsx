@@ -11,6 +11,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { api } from '../api'
+import { BankDetailModal } from '../components/BankDetailModal'
 import { InvitationResult } from '../components/InvitationResult'
 import { formatDate } from '../format'
 
@@ -21,6 +22,7 @@ export function Banks() {
   const status = (params.get('estado') as BankStatus | null) ?? undefined
   const search = params.get('buscar') ?? ''
   const page = Number(params.get('pagina') ?? '1')
+  const openBankId = Number(params.get('banco')) || null
   const [searchInput, setSearchInput] = useState(search)
 
   // Debounce the search box into the URL.
@@ -67,6 +69,7 @@ export function Banks() {
     },
   })
   const actions: RowActions = {
+    onView: (bank) => updateParams({ banco: String(bank.id) }),
     onResend: (bank) => {
       setResent(null)
       resend.mutate(bank)
@@ -158,6 +161,8 @@ export function Banks() {
           </>
         )
       )}
+
+      {openBankId && <BankDetailModal key={openBankId} bankId={openBankId} onClose={() => updateParams({ banco: null })} />}
     </div>
   )
 }
@@ -202,8 +207,26 @@ function InvitationSummary({ bank }: { bank: PlatformBank }) {
 }
 
 interface RowActions {
+  onView: (bank: PlatformBank) => void
   onResend: (bank: PlatformBank) => void
   resendingId?: number
+}
+
+function ViewButton({ bank, actions }: { bank: PlatformBank; actions: RowActions }) {
+  return (
+    <button
+      type="button"
+      onClick={() => actions.onView(bank)}
+      aria-label={`Ver ${bank.name ?? `banco de ${bank.admin.email}`}`}
+      title="Ver banco"
+      className="rounded-lg p-1.5 text-brand-700 hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-brand-600"
+    >
+      <svg viewBox="0 0 24 24" className="size-5" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    </button>
+  )
 }
 
 /** The invitation can be reissued until someone accepts it, unless the bank was deactivated. */
@@ -229,6 +252,9 @@ function BankTable({ banks, actions }: { banks: PlatformBank[]; actions: RowActi
       <table className="w-full text-left text-sm">
         <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
           <tr>
+            <th scope="col" className="w-0 py-3 pr-0 pl-3 font-medium">
+              <span className="sr-only">Ver</span>
+            </th>
             <th scope="col" className="px-4 py-3 font-medium">Banco</th>
             <th scope="col" className="px-4 py-3 font-medium">Administrador</th>
             <th scope="col" className="px-4 py-3 font-medium">Estado</th>
@@ -239,6 +265,9 @@ function BankTable({ banks, actions }: { banks: PlatformBank[]; actions: RowActi
         <tbody className="divide-y divide-slate-100">
           {banks.map((bank) => (
             <tr key={bank.id}>
+              <td className="py-3 pr-0 pl-3">
+                <ViewButton bank={bank} actions={actions} />
+              </td>
               <td className="px-4 py-3">
                 <BankName bank={bank} />
               </td>
@@ -268,7 +297,10 @@ function BankCards({ banks, actions }: { banks: PlatformBank[]; actions: RowActi
       {banks.map((bank) => (
         <li key={bank.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-2">
-            <BankName bank={bank} />
+            <div className="flex items-center gap-1">
+              <ViewButton bank={bank} actions={actions} />
+              <BankName bank={bank} />
+            </div>
             <BankStatusBadge status={bank.status} />
           </div>
           <p className="mt-2 text-sm">{bank.admin.name ?? '—'}</p>

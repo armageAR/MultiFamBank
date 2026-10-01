@@ -19,6 +19,7 @@ class AuthTest extends TestCase
         $response = $this->postJson('/api/auth/login', ['email' => '  ANA@Example.com ', 'password' => 'password']);
 
         $response->assertOk()->assertJsonPath('user.email', 'ana@example.com');
+        $this->assertNotNull(User::where('email', 'ana@example.com')->value('last_seen_at'));
         $this->withToken($response->json('token'))->getJson('/api/auth/me')->assertOk()->assertJsonPath('data.email', 'ana@example.com');
     }
 

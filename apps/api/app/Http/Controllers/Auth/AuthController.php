@@ -32,7 +32,7 @@ class AuthController extends Controller
             throw ValidationException::withMessages(['email' => 'El email o la contraseña no son correctos.']);
         }
 
-        $user->forceFill(['last_login_at' => now()])->save();
+        $user->forceFill(['last_login_at' => now(), 'last_seen_at' => now()])->save();
 
         return response()->json([
             'token' => $user->createToken($data['device_name'] ?? 'web')->plainTextToken,
