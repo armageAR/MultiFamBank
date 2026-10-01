@@ -54,7 +54,7 @@ class InvitationController extends Controller
         ]);
 
         $user = $acceptance->accept($token, $data);
-        $user->forceFill(['last_login_at' => now()])->save();
+        $user->forceFill(['last_login_at' => now(), 'last_seen_at' => now()])->save();
         $app = $invitation->type === InvitationType::BankAdmin ? 'admin' : 'client';
 
         return response()->json([

@@ -6,7 +6,9 @@ import type {
   CreateBankResponse,
   HealthResponse,
   InvitationDetails,
+  PlatformBankDetail,
   PlatformBankList,
+  UpdateAdminResponse,
   User,
 } from './types'
 
@@ -67,6 +69,30 @@ export async function createPlatformBank(
 ): Promise<CreateBankResponse> {
   const { data } = await client.post<CreateBankResponse>('/platform/banks', input)
   return data
+}
+
+export async function fetchPlatformBank(client: AxiosInstance, bankId: number): Promise<PlatformBankDetail> {
+  const { data } = await client.get<{ data: PlatformBankDetail }>(`/platform/banks/${bankId}`)
+  return data.data
+}
+
+export async function updatePlatformBankAdmin(
+  client: AxiosInstance,
+  bankId: number,
+  input: { name: string; email: string },
+): Promise<UpdateAdminResponse> {
+  const { data } = await client.patch<UpdateAdminResponse>(`/platform/banks/${bankId}/admin`, input)
+  return data
+}
+
+/** The superadmin chooses the password; the administrator is signed out everywhere. */
+export async function setPlatformBankAdminPassword(
+  client: AxiosInstance,
+  bankId: number,
+  input: { password: string; password_confirmation: string },
+): Promise<string> {
+  const { data } = await client.put<{ message: string }>(`/platform/banks/${bankId}/admin/password`, input)
+  return data.message
 }
 
 /** Issues a new administrator invitation for a bank nobody has accepted yet; earlier links stop working. */

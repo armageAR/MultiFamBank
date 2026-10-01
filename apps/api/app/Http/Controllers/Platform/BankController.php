@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Platform;
 
 use App\Enums\BankStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PlatformBankDetailResource;
 use App\Http\Resources\PlatformBankResource;
 use App\Models\Bank;
 use App\Services\BankProvisioning;
@@ -11,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class BankController extends Controller
 {
@@ -51,6 +53,40 @@ class BankController extends Controller
         $result = $provisioning->createWithAdminInvitation($data['admin_email'], $data['admin_name'], $request->user());
 
         return $this->invitationResponse($result, 201);
+    }
+
+    public function show(Bank $bank): PlatformBankDetailResource
+    {
+        return new PlatformBankDetailResource($bank->load(['admin', 'adminInvitation', 'memberships.user']));
+    }
+
+    /** Corrects the administrator's name or email. */
+    public function updateAdmin(Request $request, Bank $bank, BankProvisioning $provisioning): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'email' => ['required', 'email:rfc', 'max:255'],
+        ]);
+
+        $result = $provisioning->updateAdministrator($bank, $data['name'], $data['email'], $request->user());
+        $bank = $result['bank']->fresh(['admin', 'adminInvitation', 'memberships.user']);
+
+        return response()->json([
+            'data' => new PlatformBankDetailResource($bank),
+            // Set when a pending administrator's email changed and a new invitation was issued.
+            'email_sent' => $result['email_sent'],
+            'invitation_url' => $result['accept_url'] && config('multifambank.expose_invitation_links') ? $result['accept_url'] : null,
+        ]);
+    }
+
+    /** Sets a password chosen by the superadmin; the administrator is signed out everywhere. */
+    public function setAdminPassword(Request $request, Bank $bank, BankProvisioning $provisioning): JsonResponse
+    {
+        $data = $request->validate(['password' => ['required', 'confirmed', Password::min(8)]]);
+
+        $provisioning->setAdministratorPassword($bank, $data['password']);
+
+        return response()->json(['message' => 'Contraseña actualizada. El administrador tiene que volver a ingresar.']);
     }
 
     /** Issues a new administrator invitation; earlier links stop working. */

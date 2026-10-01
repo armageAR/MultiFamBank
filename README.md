@@ -4,7 +4,7 @@ MultiFamBank is the next version of [FamBank](https://github.com/armageAR/famban
 
 Each family operates an independent **bank**, with its own administrator, clients, savings accounts, requests, and expense reports. Clients can belong to multiple banks, while a person can administer only one bank.
 
-> **Project status:** The monorepo is deployed to Railway. Implemented so far: the full database schema, sign-in and password reset, the platform superadmin application (bank list, bank creation with an administrator invitation, and invitation resend), and invitation acceptance plus bank setup in the administrator application. Client features, requests, confirmations, and reports are planned, not implemented yet. The original FamBank repository contains the first working version.
+> **Project status:** The monorepo is deployed to Railway. Implemented so far: the full database schema, sign-in and password reset, the platform superadmin application (bank list, bank creation with an administrator invitation, invitation resend, and a bank detail view to manage the administrator and see clients), and invitation acceptance plus bank setup in the administrator application. Client features, requests, confirmations, and reports are planned, not implemented yet. The original FamBank repository contains the first working version.
 
 In this project, “bank” means a private family ledger. MultiFamBank does not hold money, transfer funds, execute currency exchange, or provide banking services. Administrators record money received or delivered outside the application.
 
@@ -55,7 +55,7 @@ An existing client identity can become a bank administrator if it does not alrea
 
 Invitations expire, can be resent, and can be accepted only once. Resending an invitation must not create another bank or user. Bank deactivation does not automatically release the administrator's email for creation of another bank.
 
-The superadmin can initiate an administrator password reset by email. Passwords are never exposed to the superadmin. Because credentials belong to the shared identity, resetting a password also changes that person's access to the client application.
+The superadmin can view each bank's administrator and clients (with their last activity, never their balances), correct the administrator's name and email, and set a new administrator password. Setting a password signs the administrator out of every session and is recorded in the audit log without the password itself; the superadmin then shares it through a safe channel. Because name, email, and credentials belong to the shared identity, these changes also apply to that person's client access in other banks. Changing a pending administrator's email revokes the previous invitation and issues a new one.
 
 ## Client invitations and membership
 
