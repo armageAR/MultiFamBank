@@ -39,6 +39,8 @@ export function AuthProvider({
         // Drop every cached result so nothing from this account reaches the next one. Reset (not
         // clear) keeps mounted queries alive and refetches them, e.g. a public invitation page.
         if (next === null) {
+          // An expired or revoked session also stops this device's notifications.
+          void forgetPushSubscription()
           onSessionEnd?.()
           void queryClient.resetQueries()
         }
@@ -47,7 +49,8 @@ export function AuthProvider({
   )
 
   const me = useQuery({
-    queryKey: ['me', token],
+    // Not keyed by the token: the key is persisted for offline use and must not contain secrets.
+    queryKey: ['me'],
     queryFn: () => fetchMe(api),
     enabled: token !== null,
     retry: false,
@@ -58,7 +61,7 @@ export function AuthProvider({
     (newToken: string, user: User) => {
       // Data cached for a previous account; the current page's queries stay mounted.
       queryClient.removeQueries({ type: 'inactive' })
-      queryClient.setQueryData(['me', newToken], user)
+      queryClient.setQueryData(['me'], user)
       tokenStore.set(newToken)
     },
     [queryClient, tokenStore],

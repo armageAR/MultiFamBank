@@ -62,7 +62,7 @@ export function Modal({ title, onClose, children }: ModalProps) {
           </svg>
         </button>
       </div>
-      <div className={family ? 'flex flex-col gap-4 p-5' : 'space-y-4 p-5'}>{children}</div>
+      <div className={family ? 'flex flex-col gap-4 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]' : 'space-y-4 p-5'}>{children}</div>
     </dialog>
   )
 }

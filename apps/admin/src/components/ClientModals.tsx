@@ -9,10 +9,10 @@ import {
   type ApiError,
   type InvitationResult,
 } from '@multifambank/api-client'
-import { Alert, Button, Modal, TextField } from '@multifambank/ui'
+import { Alert, Button, Modal, parseAmount, TextField, toAmountInput } from '@multifambank/ui'
 import { useState, type FormEvent } from 'react'
 import { api } from '../api'
-import { localToIso, parseAmount } from '../amounts'
+import { localToIso } from '../amounts'
 import { useExchangeRates, useRefreshAdminData } from '../queries'
 import { suggestedRate, type OperationDraft } from '../operationDraft'
 import { OperationFields } from './OperationFields'
@@ -245,12 +245,12 @@ export function NewOperationModal({ client, onClose }: { client: AdminClient; on
   const [draft, setDraft] = useState<OperationDraft>({ type: 'savings_deposit', amount: '', description: '', rate: '', occurredAt: '' })
   const [error, setError] = useState<ApiError | null>(null)
   const [loading, setLoading] = useState(false)
-  const rate = draft.rate || suggestedRate(draft.type, rates.data)
+  const rate = draft.rate || toAmountInput(suggestedRate(draft.type, rates.data))
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     const amount = parseAmount(draft.amount)
-    const parsedRate = draft.type === 'expense' ? null : parseAmount(rate)
+    const parsedRate = draft.type === 'expense' ? null : parseAmount(rate, 4)
     if (!amount) return setError({ message: 'Ingresá un monto válido.', fields: { amount_ars: 'Ingresá un monto válido.' } })
     if (draft.type !== 'expense' && !parsedRate) return setError({ message: 'Ingresá la cotización.', fields: { exchange_rate: 'Ingresá la cotización.' } })
 

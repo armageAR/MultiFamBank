@@ -12,6 +12,12 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   return bytes
 }
 
+/** The service worker registration, or null if there is none within a few seconds (e.g. in development). */
+async function registration(): Promise<ServiceWorkerRegistration | null> {
+  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+  return Promise.race([navigator.serviceWorker.ready, timeout])
+}
+
 function supported(): boolean {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 }
@@ -22,11 +28,20 @@ export function usePushNotifications(api: AxiosInstance) {
   const [message, setMessage] = useState<string | null>(null)
 
   const check = useCallback(async () => {
-    if (!supported()) return setStatus('unsupported')
-    if (Notification.permission === 'denied') return setStatus('denied')
-    const registration = await navigator.serviceWorker.ready
-    setStatus((await registration.pushManager.getSubscription()) ? 'subscribed' : 'unsubscribed')
-  }, [])
+    try {
+      if (!supported()) return setStatus('unsupported')
+      if (Notification.permission === 'denied') return setStatus('denied')
+      const reg = await registration()
+      if (!reg) return setStatus('unsupported')
+      const subscription = await reg.pushManager.getSubscription()
+      // Re-register this device for whoever is signed in now, so it never keeps receiving the
+      // notifications of a previous user.
+      if (subscription) await savePushSubscription(api, subscription.toJSON())
+      setStatus(subscription ? 'subscribed' : 'unsubscribed')
+    } catch {
+      setStatus('unsubscribed')
+    }
+  }, [api])
 
   useEffect(() => {
     void check()
@@ -44,10 +59,15 @@ export function usePushNotifications(api: AxiosInstance) {
       }
       if ((await Notification.requestPermission()) !== 'granted') return setStatus('denied')
 
-      const registration = await navigator.serviceWorker.ready
+      const reg = await registration()
+      if (!reg) return setStatus('unsupported')
       // A fresh subscription guarantees it uses the server's current key.
-      await (await registration.pushManager.getSubscription())?.unsubscribe()
-      const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) })
+      const previous = await reg.pushManager.getSubscription()
+      if (previous) {
+        await deletePushSubscription(api, previous.endpoint).catch(() => undefined)
+        await previous.unsubscribe()
+      }
+      const subscription = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) })
       await savePushSubscription(api, subscription.toJSON())
       setStatus('subscribed')
       setMessage('Notificaciones activadas en este dispositivo.')
@@ -70,13 +90,15 @@ export function usePushNotifications(api: AxiosInstance) {
 }
 
 /** Removes this device's subscription so the next person signing in does not get the previous user's notifications. */
-export async function forgetPushSubscription(api: AxiosInstance): Promise<void> {
+export async function forgetPushSubscription(api?: AxiosInstance): Promise<void> {
   if (!supported()) return
   try {
-    const registration = await navigator.serviceWorker.getRegistration()
-    const subscription = await registration?.pushManager.getSubscription()
+    const reg = await navigator.serviceWorker.getRegistration()
+    const subscription = await reg?.pushManager.getSubscription()
     if (!subscription) return
-    await deletePushSubscription(api, subscription.endpoint).catch(() => undefined)
+    // Unsubscribing locally is what matters; the server forgets endpoints that stop working.
+    // The DELETE is not awaited so a slow network cannot hold up signing out.
+    if (api) void deletePushSubscription(api, subscription.endpoint).catch(() => undefined)
     await subscription.unsubscribe()
   } catch {
     // Best effort: signing out must never fail because of push.

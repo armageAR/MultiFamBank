@@ -1,6 +1,6 @@
 import type { ExchangeRates, OperationType } from '@multifambank/api-client'
 import { suggestedRate, type OperationDraft } from '../operationDraft'
-import { operationLabels, SelectField, TextField } from '@multifambank/ui'
+import { operationLabels, SelectField, TextField, toAmountInput } from '@multifambank/ui'
 
 interface Props {
   draft: OperationDraft
@@ -24,8 +24,10 @@ export function OperationFields({ draft, onChange, errors, rates, disabled, date
         error={errors.type}
         onChange={(e) => {
           const type = e.target.value as OperationType
-          // Moving into a savings type starts from today's quote when there was none.
-          set({ type, rate: type === 'expense' ? '' : draft.rate || suggestedRate(type, rates) })
+          // An untouched suggestion follows the type (deposit blue sell, withdrawal blue buy);
+          // a rate the administrator typed is kept.
+          const untouched = !draft.rate || draft.rate === toAmountInput(suggestedRate(draft.type, rates))
+          set({ type, rate: type === 'expense' ? '' : untouched ? toAmountInput(suggestedRate(type, rates)) : draft.rate })
         }}
       >
         {(Object.keys(operationLabels) as OperationType[]).map((type) => (

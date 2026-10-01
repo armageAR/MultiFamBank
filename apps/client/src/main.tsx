@@ -8,7 +8,7 @@ import { api, tokenStore } from './api'
 import './index.css'
 import { Home } from './routes/Home'
 
-const { queryClient, persister, clearStorage, maxAge } = createOfflineQueryClient('mfb.client.cache')
+const { queryClient, persister, clearStorage, maxAge, buster, dehydrateOptions } = createOfflineQueryClient('mfb.client.cache')
 
 const router = createBrowserRouter([
   { path: '/', element: <Home /> },
@@ -32,7 +32,7 @@ const router = createBrowserRouter([
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <LookProvider look="family">
-      <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge }}>
+      <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge, buster, dehydrateOptions }}>
         <AuthProvider api={api} tokenStore={tokenStore} onSessionEnd={clearStorage}>
           <RouterProvider router={router} />
         </AuthProvider>

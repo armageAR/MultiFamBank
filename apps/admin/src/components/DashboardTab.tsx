@@ -1,6 +1,7 @@
 import { fetchAdminDashboard, fetchExchangeRates, toApiError } from '@multifambank/api-client'
 import { Alert, Card, formatArs, formatNumber, formatUsd } from '@multifambank/ui'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { api } from '../api'
 import { keys } from '../queries'
 
@@ -23,10 +24,20 @@ export function DashboardTab() {
   const dashboard = useQuery({ queryKey: keys.dashboard, queryFn: () => fetchAdminDashboard(api) })
   const rates = dashboard.data?.exchange_rates ?? null
 
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+
   async function refreshRates() {
-    const fresh = await fetchExchangeRates(api, true)
-    queryClient.setQueryData(keys.rates, fresh)
-    await queryClient.invalidateQueries({ queryKey: keys.dashboard })
+    setRefreshing(true)
+    setRefreshError(null)
+    try {
+      queryClient.setQueryData(keys.rates, await fetchExchangeRates(api, true))
+      await queryClient.invalidateQueries({ queryKey: keys.dashboard })
+    } catch (error) {
+      setRefreshError(toApiError(error).message)
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   if (dashboard.isPending) return <p className="text-center text-sm text-gray-500">Cargando…</p>
@@ -74,10 +85,11 @@ export function DashboardTab() {
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-xs text-gray-500">Dólar blue</p>
-                <button type="button" onClick={refreshRates} className="text-xs text-gray-500 transition-colors hover:text-emerald-600">
-                  actualizar
+                <button type="button" onClick={refreshRates} disabled={refreshing} className="text-xs text-gray-500 transition-colors hover:text-emerald-600 disabled:opacity-50">
+                  {refreshing ? 'actualizando…' : 'actualizar'}
                 </button>
               </div>
+              {refreshError && <p className="mb-2 text-xs text-red-600">{refreshError}</p>}
               <div className="grid grid-cols-2 gap-3">
                 <Quote label="Compra" value={rates.blue.buy} />
                 <Quote label="Venta" value={rates.blue.sell} />

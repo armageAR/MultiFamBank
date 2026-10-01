@@ -159,10 +159,11 @@ export function ClientsTab({ readOnly }: { readOnly: boolean }) {
         </>
       )}
 
-      {dialog?.kind === 'invite' && <InviteModal onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'edit' && <EditClientModal client={dialog.client} onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'password' && <PasswordModal client={dialog.client} onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'operation' && <NewOperationModal client={dialog.client} onClose={() => setDialog(null)} />}
+      {/* Write dialogs close themselves when the bank pauses or the device goes offline. */}
+      {!readOnly && dialog?.kind === 'invite' && <InviteModal onClose={() => setDialog(null)} />}
+      {!readOnly && dialog?.kind === 'edit' && <EditClientModal client={dialog.client} onClose={() => setDialog(null)} />}
+      {!readOnly && dialog?.kind === 'password' && <PasswordModal client={dialog.client} onClose={() => setDialog(null)} />}
+      {!readOnly && dialog?.kind === 'operation' && <NewOperationModal client={dialog.client} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'history' && <HistoryModal client={dialog.client} readOnly={readOnly} onClose={() => setDialog(null)} />}
     </div>
   )

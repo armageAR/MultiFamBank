@@ -1,7 +1,7 @@
 import { requestOperation, toApiError, type ApiError, type OperationType } from '@multifambank/api-client'
-import { Alert, Button, Modal, operationLabels, TextField } from '@multifambank/ui'
+import { Alert, Button, Modal, operationLabels, parseAmount, TextField } from '@multifambank/ui'
 import { useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { api } from './api'
 
 const choices: { type: OperationType; title: string; detail: string }[] = [
@@ -10,13 +10,6 @@ const choices: { type: OperationType; title: string; detail: string }[] = [
   { type: 'expense', title: 'Pedir para un gasto', detail: 'Dinero del banco, no de mis ahorros' },
 ]
 
-function parseAmount(input: string): string | null {
-  let value = input.replace(/[\s$]/g, '')
-  if (value.includes(',')) value = value.replace(/\./g, '').replace(',', '.')
-  else if ((value.match(/\./g) ?? []).length > 1 || /\.\d{3}$/.test(value)) value = value.replace(/\./g, '')
-  return /^\d+(\.\d{1,2})?$/.test(value) ? value : null
-}
-
 export function NewRequestModal({ bankId, onClose }: { bankId: number; onClose: () => void }) {
   const queryClient = useQueryClient()
   const [type, setType] = useState<OperationType>('savings_deposit')
@@ -24,8 +17,9 @@ export function NewRequestModal({ bankId, onClose }: { bankId: number; onClose: 
   const [description, setDescription] = useState('')
   const [error, setError] = useState<ApiError | null>(null)
   const [loading, setLoading] = useState(false)
-  // One id per attempt: retrying after a network error cannot create the request twice.
-  const [requestId] = useState(() => crypto.randomUUID())
+  // The id belongs to one request content: retrying the same request after a network error reuses
+  // it (the server answers with the request it already has); changing type or amount gets a new one.
+  const attempt = useRef<{ content: string; id: string } | null>(null)
   const isExpense = type === 'expense'
 
   async function submit(event: FormEvent) {
@@ -36,10 +30,13 @@ export function NewRequestModal({ bankId, onClose }: { bankId: number; onClose: 
       return setError({ message: 'Contá para qué es la plata.', fields: { description: 'Contá para qué es la plata.' } })
     }
 
+    const content = `${type}|${parsed}`
+    if (attempt.current?.content !== content) attempt.current = { content, id: crypto.randomUUID() }
+
     setLoading(true)
     setError(null)
     try {
-      await requestOperation(api, bankId, { id: requestId, type, amount_ars: parsed, description: description.trim() || null })
+      await requestOperation(api, bankId, { id: attempt.current.id, type, amount_ars: parsed, description: description.trim() || null })
       await queryClient.invalidateQueries({ queryKey: ['client'] })
       onClose()
     } catch (err) {

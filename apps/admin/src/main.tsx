@@ -10,7 +10,7 @@ import { AdminHome } from './routes/AdminHome'
 import { BankSetup } from './routes/BankSetup'
 
 // The last downloaded data stays readable offline; it is wiped when the session ends.
-const { queryClient, persister, clearStorage, maxAge } = createOfflineQueryClient('mfb.admin.cache')
+const { queryClient, persister, clearStorage, maxAge, buster, dehydrateOptions } = createOfflineQueryClient('mfb.admin.cache')
 
 const router = createBrowserRouter([
   { path: '/ingresar', element: <LoginPage appName="Administración" api={api} /> },
@@ -35,7 +35,7 @@ const router = createBrowserRouter([
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <LookProvider look="family">
-      <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge }}>
+      <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge, buster, dehydrateOptions }}>
         <AuthProvider api={api} tokenStore={tokenStore} onSessionEnd={clearStorage}>
           <RouterProvider router={router} />
         </AuthProvider>

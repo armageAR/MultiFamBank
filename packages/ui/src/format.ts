@@ -4,7 +4,33 @@ export function formatNumber(value: string | number, decimals = 2): string {
 }
 
 export const formatUsd = (value: string | number) => `USD ${formatNumber(value)}`
-export const formatArs = (value: string | number) => `$ ${formatNumber(value, 0)}`
+/** Pesos without decimals unless there are cents. */
+export const formatArs = (value: string | number) =>
+  `$ ${Number(value).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+
+/**
+ * Reads amounts as people type them in Argentina: "15000", "15.000", "15.000,50", "1415,125" or
+ * "15000.5". A dot is a thousands separator only in groups of three ("15.000", "1.250.000").
+ * Returns a plain decimal string, or null when it is not a number with at most maxDecimals.
+ */
+export function parseAmount(input: string, maxDecimals = 2): string | null {
+  let value = input.replace(/[\s$]/g, '')
+  if (!value) return null
+
+  if (value.includes(',')) {
+    value = value.replace(/\./g, '').replace(',', '.')
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(value)) {
+    value = value.replace(/\./g, '')
+  }
+
+  return new RegExp(`^\\d+(\\.\\d{1,${maxDecimals}})?$`).test(value) ? value : null
+}
+
+/** A stored decimal ("1415.1250") as it would be typed in Argentina ("1415,125"). */
+export function toAmountInput(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === '') return ''
+  return Number(value).toLocaleString('es-AR', { useGrouping: false, maximumFractionDigits: 4 })
+}
 
 const dateFormat = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 const dateTimeFormat = new Intl.DateTimeFormat('es-AR', {

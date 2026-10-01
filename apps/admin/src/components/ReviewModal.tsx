@@ -1,8 +1,8 @@
 import { confirmOperation, rejectOperation, toApiError, updateOperation, type ApiError, type Operation, type OperationEdit } from '@multifambank/api-client'
-import { Alert, Button, formatArs, Modal, operationLabels, TextField, toDateTimeLocal } from '@multifambank/ui'
+import { Alert, Button, formatArs, Modal, operationLabels, parseAmount, TextField, toAmountInput, toDateTimeLocal } from '@multifambank/ui'
 import { useState } from 'react'
 import { api } from '../api'
-import { localToIso, parseAmount } from '../amounts'
+import { localToIso } from '../amounts'
 import { useExchangeRates, useRefreshAdminData } from '../queries'
 import { type OperationDraft } from '../operationDraft'
 import { OperationFields } from './OperationFields'
@@ -13,9 +13,9 @@ export function ReviewModal({ operation, onClose }: { operation: Operation; onCl
   const rates = useExchangeRates()
   const [draft, setDraft] = useState<OperationDraft>({
     type: operation.type,
-    amount: operation.amount_ars.replace(/\.00$/, ''),
+    amount: toAmountInput(operation.amount_ars),
     description: operation.description ?? '',
-    rate: operation.exchange_rate ? String(Number(operation.exchange_rate)) : '',
+    rate: toAmountInput(operation.exchange_rate),
     occurredAt: operation.occurred_at ? toDateTimeLocal(operation.occurred_at) : '',
   })
   const [error, setError] = useState<ApiError | null>(null)
@@ -25,7 +25,7 @@ export function ReviewModal({ operation, onClose }: { operation: Operation; onCl
 
   function changes(): OperationEdit | null {
     const amount = parseAmount(draft.amount)
-    const rate = draft.type === 'expense' ? null : parseAmount(draft.rate)
+    const rate = draft.type === 'expense' ? null : parseAmount(draft.rate, 4)
     const fields: Record<string, string> = {}
     if (!amount) fields.amount_ars = 'Ingresá un monto válido.'
     if (draft.type !== 'expense' && !rate) fields.exchange_rate = 'Ingresá la cotización.'

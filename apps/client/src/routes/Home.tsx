@@ -130,7 +130,7 @@ function BankView({ membership, banks, onSwitch }: { membership: ClientBank; ban
         )}
       </Card>
 
-      {asking && <NewRequestModal bankId={bankId} onClose={() => setAsking(false)} />}
+      {asking && !readOnly && <NewRequestModal bankId={bankId} onClose={() => setAsking(false)} />}
     </FamilyShell>
   )
 }

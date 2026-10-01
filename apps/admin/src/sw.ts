@@ -37,10 +37,17 @@ self.addEventListener('notificationclick', (event) => {
   const url = new URL((event.notification.data as { url?: string } | null)?.url ?? '/', self.location.origin).href
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+    self.clients.matchAll({ type: 'window' }).then(async (windows) => {
       const existing = windows.find((client) => new URL(client.url).origin === self.location.origin)
-      if (existing) return existing.focus().then((client) => client.navigate(url))
-      return self.clients.openWindow(url)
+      if (existing) {
+        try {
+          const focused = await existing.focus()
+          if (await focused.navigate(url)) return
+        } catch {
+          // Not controlled by this worker: open a new window instead.
+        }
+      }
+      await self.clients.openWindow(url)
     }),
   )
 })

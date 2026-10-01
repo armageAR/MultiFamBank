@@ -124,7 +124,7 @@ export function AdminHome() {
       {tab === 'clientes' && <ClientsTab readOnly={readOnly} />}
       {tab === 'reporte' && <ReportTab />}
 
-      {!paused && (
+      {!readOnly && (
         <p className="text-center">
           <Link to="/configurar-banco" className="text-xs text-gray-500 transition-colors hover:text-emerald-600">
             editar datos del banco
@@ -132,7 +132,7 @@ export function AdminHome() {
         </p>
       )}
 
-      {current && <ReviewModal operation={current} onClose={closeReview} />}
+      {current && !readOnly && <ReviewModal operation={current} onClose={closeReview} />}
     </FamilyShell>
   )
 }

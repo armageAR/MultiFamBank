@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react'
  * Query client whose cache survives reloads, so the last downloaded data is readable offline.
  * Writes fail fast when offline instead of waiting, so the UI can say so.
  */
+const CACHE_VERSION = '2026-10-01'
+
 export function createOfflineQueryClient(storageKey: string) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -32,7 +34,19 @@ export function createOfflineQueryClient(storageKey: string) {
     }
   }
 
-  return { queryClient, persister, clearStorage, maxAge: 7 * 24 * 60 * 60_000 }
+  return {
+    queryClient,
+    persister,
+    clearStorage,
+    maxAge: 7 * 24 * 60 * 60_000,
+    // A new build may change response shapes: older stored data is discarded.
+    buster: CACHE_VERSION,
+    dehydrateOptions: {
+      // Only successful data, and never invitations (their key is a single-use token).
+      shouldDehydrateQuery: (query: { queryKey: readonly unknown[]; state: { status: string } }) =>
+        query.state.status === 'success' && query.queryKey[0] !== 'invitation',
+    },
+  }
 }
 
 export function useOnline(): boolean {
