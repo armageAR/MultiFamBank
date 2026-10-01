@@ -92,6 +92,9 @@ function BankSection({ bank }: { bank: PlatformBankDetail }) {
       setConfirming(null)
     } catch (err) {
       setError(toApiError(err))
+      // The status may have changed elsewhere (another tab); show the current one.
+      setConfirming(null)
+      await queryClient.invalidateQueries({ queryKey: ['platform-bank', bank.id] })
     } finally {
       setRunning(null)
     }
