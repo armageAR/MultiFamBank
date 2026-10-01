@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { EnvironmentBadge } from './EnvironmentBadge'
+import { environmentLabel } from './environment'
 
 interface AppShellProps {
   title: string
@@ -11,11 +13,14 @@ interface AppShellProps {
 export function AppShell({ title, subtitle, actions, children }: AppShellProps) {
   return (
     <div className="min-h-dvh bg-slate-50 font-sans text-slate-900">
-      <header className="bg-brand-900 px-4 py-5 text-white">
+      <header className={`bg-brand-900 px-4 py-5 text-white ${environmentLabel ? 'border-t-8 border-red-600' : ''}`}>
         <div className="mx-auto flex max-w-5xl flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-brand-100">MultiFamBank</p>
-            <h1 className="text-2xl font-semibold">{title}</h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-semibold">{title}</h1>
+              <EnvironmentBadge />
+            </div>
             {subtitle && <p className="mt-1 text-brand-100">{subtitle}</p>}
           </div>
           {actions && <div className="flex items-center gap-3 text-sm">{actions}</div>}
