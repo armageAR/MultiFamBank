@@ -1,5 +1,5 @@
 import { forgotPassword, login, resetPassword, toApiError, type ApiError } from '@multifambank/api-client'
-import { Alert, AuthLayout, Button, TextField } from '@multifambank/ui'
+import { Alert, AuthLayout, Button, TextField, useLinkClass } from '@multifambank/ui'
 import type { AxiosInstance } from 'axios'
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
@@ -15,6 +15,7 @@ interface PageProps {
 const paths = { login: '/ingresar', forgot: '/olvide-contrasena' }
 
 export function LoginPage({ appName, api }: PageProps) {
+  const link = useLinkClass()
   const { user, signIn } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -63,7 +64,7 @@ export function LoginPage({ appName, api }: PageProps) {
           Ingresar
         </Button>
         <p className="text-center text-sm">
-          <Link to={paths.forgot} className="text-brand-700 hover:underline">
+          <Link to={paths.forgot} className={link}>
             Olvidé mi contraseña
           </Link>
         </p>
@@ -73,6 +74,7 @@ export function LoginPage({ appName, api }: PageProps) {
 }
 
 export function ForgotPasswordPage({ appName, api }: PageProps) {
+  const link = useLinkClass()
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState<string | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
@@ -113,7 +115,7 @@ export function ForgotPasswordPage({ appName, api }: PageProps) {
         </form>
       )}
       <p className="mt-4 text-center text-sm">
-        <Link to={paths.login} className="text-brand-700 hover:underline">
+        <Link to={paths.login} className={link}>
           Volver a ingresar
         </Link>
       </p>
@@ -123,6 +125,7 @@ export function ForgotPasswordPage({ appName, api }: PageProps) {
 
 /** Opened from the emailed link (or the superadmin:create link): ?token=…&email=… */
 export function ResetPasswordPage({ appName, api }: PageProps) {
+  const link = useLinkClass()
   const [params] = useSearchParams()
   const token = params.get('token') ?? ''
   const email = params.get('email') ?? ''
@@ -158,7 +161,7 @@ export function ResetPasswordPage({ appName, api }: PageProps) {
       {done ? (
         <div className="space-y-4">
           <Alert tone="success">{done}</Alert>
-          <Link to={paths.login} className="block text-center text-sm text-brand-700 hover:underline">
+          <Link to={paths.login} className={`block text-center text-sm ${link}`}>
             Ir a ingresar
           </Link>
         </div>

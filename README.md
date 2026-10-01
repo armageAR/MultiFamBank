@@ -15,15 +15,15 @@ MultiFamBank distinguishes two sources of money:
 - **Client savings:** money belonging to the client, tracked in USD. Clients can deposit money and request withdrawals.
 - **Bank funds:** money provided by the bank administrator to cover a client's expense. Clients can request this money, but cannot deposit into this source. Confirmed requests do not reduce the client's savings.
 
-For example, a client may request ARS for transportation using bank funds. The administrator can confirm that delivery as a bank expense, or change the source to client savings before confirming if the client should pay for it.
+For example, a client may ask for ARS for an outing as an expense, explaining what it is for. The administrator can confirm it as a bank expense, or change it to a savings withdrawal before confirming if the client should pay for it.
 
 There are three separate interfaces, backed by one API and one central database:
 
 | Application | Audience | Main responsibilities |
 | --- | --- | --- |
 | Client PWA | Clients of one or more banks | View savings, submit deposits and withdrawals, request bank-funded expenses, and review personal history. |
-| Bank administrator PWA | Administrator of one bank | Manage clients, review requests, edit amounts and funding sources, confirm operations, and review reports. |
-| Platform administration web app | The single FamBank superadmin | Create banks and their administrators, send administrator password-reset links, pause banks, and deactivate banks. |
+| Bank administrator PWA | Administrator of one bank | Manage clients, review requests, edit amount, type, comment and date, confirm operations, and review reports. |
+| Platform administration web app | The single FamBank superadmin | Create banks and invite their administrators, manage administrators, pause, deactivate, and reactivate banks. |
 
 The initial interface language is Spanish; project documentation is English.
 
@@ -84,11 +84,15 @@ The server checks bank status on every financial write, including synchronizatio
 
 ## Savings and bank-funded expenses
 
-| Operation | Funding source | Currency entered | Effect when confirmed |
-| --- | --- | --- | --- |
-| Savings deposit | Client savings | ARS | Credits the client's USD savings account using the recorded exchange rate. |
-| Savings withdrawal | Client savings | ARS | Debits the client's USD savings account using the recorded exchange rate. |
-| Expense request | Bank funds | ARS | Records a bank-funded expense for that client; does not change their savings. |
+There are exactly three operation types and none has a category. Deposits and withdrawals work as in the original FamBank; expenses are new.
+
+| Operation | Whose money | Currency entered | Comment | Effect when confirmed |
+| --- | --- | --- | --- | --- |
+| Savings deposit | Client savings | ARS | Optional | Credits the client's USD savings account using the recorded exchange rate. |
+| Savings withdrawal | Client savings | ARS | Optional | Debits the client's USD savings account using the recorded exchange rate. |
+| Expense | Bank funds | ARS | **Required**: the client must explain what the money is for | Records a bank-funded expense for that client; does not change their savings. |
+
+The type alone decides whose money moves; there is no separate funding-source field.
 
 Bank funds initially represent an expense source, **not a separate bank cash balance**. Treasury management is outside the initial scope.
 
@@ -101,13 +105,11 @@ Amounts and rates must use decimal-safe representations, not floating-point bala
 Money requests include:
 
 - Bank and client.
-- Requested amount in ARS.
-- Explicit funding source.
-- Purpose or description.
-- Expense category when applicable, such as transportation, food, education, health, leisure, or other.
-- Creation date, current status, and confirmation date when applicable.
+- Type and amount in ARS.
+- A one-line comment, mandatory for expenses.
+- Operation date, current status, and confirmation date when applicable.
 
-Funding ownership must be clear throughout forms, lists, details, confirmation screens, and notifications. Color can reinforce the distinction but cannot be the only indicator.
+Whose money is involved must be clear throughout forms, lists, details, confirmation screens, and notifications. Color can reinforce the distinction but cannot be the only indicator.
 
 Suggested initial Spanish labels:
 
@@ -122,7 +124,7 @@ No role or funding-source label depends on the word “dad” or a particular fa
 
 Requests have four business states: **pending, confirmed, rejected, and canceled**.
 
-- Confirming a withdrawal or bank-funded expense means the administrator has delivered the money.
+- Confirming a withdrawal or an expense means the administrator has delivered the money.
 - Confirming a deposit means the administrator has received the money.
 - There is no separate “approved but not delivered” state.
 - Clients can cancel pending requests.
@@ -131,29 +133,32 @@ Requests have four business states: **pending, confirmed, rejected, and canceled
 
 ### Administrator adjustments
 
-Before confirming an outgoing request, the administrator can edit:
+On a pending request of any type, the administrator can change everything before confirming:
 
 - The amount.
-- The funding source: client savings or bank funds.
-- The applicable exchange rate when using client savings.
-- The category and description.
+- The type: deposit, withdrawal, or expense (for example, turning an expense into a savings withdrawal). An expense still needs a comment.
+- The comment.
+- The operation date.
+- The exchange rate, when the operation moves client savings.
 
-The ability to switch funding sources applies to outgoing money requests; it does not turn a savings deposit into a bank-funded deposit.
+After confirmation, only the **operation date** can still be changed; amounts and types are final because they already changed balances. Changing the date moves the operation between months in reports.
 
-The original request and the final confirmed values must both be retained, including who changed them. Clients must be able to see when their requested source or amount changed.
+The original request (type, amount, comment) and the final values are both retained, and every change is recorded in the audit log with who made it. Clients can see when their request was changed.
 
-Example: a client requests ARS 15,000 from bank funds for an outing. The administrator changes the source to client savings and confirms delivery. The USD equivalent is deducted from that client's account, and the operation is excluded from bank-funded expense totals.
+Example: a client asks for ARS 15,000 as an expense for an outing. The administrator changes it to a savings withdrawal and confirms delivery. The USD equivalent is deducted from that client's account, and the operation is excluded from bank-funded expense totals.
+
+The operation date defaults to the confirmation time; the administrator can set another one.
 
 ### Balance integrity and reservations
 
-The original FamBank reserves USD for pending savings withdrawals. MultiFamBank should preserve that protection while supporting funding-source changes:
+The original FamBank reserves USD for pending savings withdrawals. MultiFamBank keeps that protection while the administrator can change a request's type:
 
 - A server-accepted pending savings withdrawal reserves the corresponding USD amount.
 - Pending deposits do not increase available savings.
-- Pending bank-funded requests do not reserve client savings.
+- Pending expenses do not reserve client savings.
 - Rejection or cancellation releases a savings withdrawal reservation.
-- Switching from savings to bank funds releases the reservation atomically when the operation is confirmed.
-- Switching from bank funds to savings requires an available-balance check and a debit at confirmation.
+- Changing a withdrawal into an expense or a deposit releases the reservation atomically.
+- Changing an expense or a deposit into a withdrawal requires an available-balance check.
 - Changing the amount or exchange rate requires recalculating the savings effect and validating available funds.
 - Confirmation settles the reservation and records the final debit exactly once.
 
@@ -161,16 +166,16 @@ Confirmed balance, reserved amount, and available balance must be distinguishabl
 
 ## Reporting
 
-Client history shows savings deposits, savings withdrawals, and bank-funded expenses with their source and status clearly identified.
+Client history shows savings deposits, savings withdrawals, and expenses with whose money moved, the comment, and the status clearly identified.
 
 Bank administrators can review:
 
-- Monthly bank-funded expenses, grouped by client and category.
-- The purpose and amount of each confirmed expense.
+- Monthly bank-funded expenses, in total and by client.
+- The comment and amount of each confirmed expense.
 - Savings deposits and withdrawals, separately from bank-funded expenses.
 - Pending requests separately from confirmed operations.
 
-Monthly expense totals use the **confirmation date**, because confirmation records actual delivery. Savings withdrawals are never counted as expenses paid by the bank. Reporting periods should use the bank's configured timezone.
+Monthly expense totals use the **operation date**, which defaults to the confirmation time and can be corrected by the administrator. Savings withdrawals are never counted as expenses paid by the bank. Reporting periods should use the bank's configured timezone.
 
 The platform panel handles bank lifecycle and administrator management rather than acting as a cross-bank financial dashboard.
 
@@ -331,7 +336,7 @@ The initial design uses a shared database with bank-scoped records rather than a
 | Bank memberships | A user's client membership in a bank, with membership status. |
 | Savings accounts | A client's USD savings balance within one bank. |
 | Invitations | Administrator onboarding or client membership invitations, with expiry and acceptance state. |
-| Requests | Requested operation, source, amount, purpose, and business status. |
+| Requests | Requested and final type, amount, comment, operation date, and business status. |
 | Savings reservations | Funds reserved by pending savings withdrawals. |
 | Ledger records | Confirmed savings movements and bank-funded expenses. |
 | Audit records | Original and final values, responsible actor, and relevant lifecycle or financial changes. |
