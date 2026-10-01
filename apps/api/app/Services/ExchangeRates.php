@@ -20,6 +20,8 @@ class ExchangeRates
 
     private const LAST_GOOD_KEY = 'exchange_rates.last_good';
 
+    private const FAILURE_KEY = 'exchange_rates.failing';
+
     /**
      * @return array{blue: array{buy: string, sell: string}, oficial: array{buy: string, sell: string}, fetched_at: string}
      *
@@ -28,6 +30,10 @@ class ExchangeRates
     public function latest(): array
     {
         try {
+            if (Cache::has(self::FAILURE_KEY)) {
+                throw new ExchangeRateUnavailableException('No se pudo obtener la cotización del dólar en este momento. Volvé a intentarlo en unos minutos.');
+            }
+
             return Cache::remember(self::CACHE_KEY, self::CACHE_SECONDS, function () {
                 $rates = $this->fetch();
                 Cache::forever(self::LAST_GOOD_KEY, $rates);
@@ -35,8 +41,17 @@ class ExchangeRates
                 return $rates;
             });
         } catch (ExchangeRateUnavailableException $e) {
-            // Bluelytics is down: the last quote we got is better than blocking every request.
-            return Cache::get(self::LAST_GOOD_KEY) ?? throw $e;
+            // Avoid waiting on a down service for every request.
+            Cache::add(self::FAILURE_KEY, true, 30);
+
+            // Bluelytics is down: a quote from the last day is better than blocking every request.
+            $lastGood = Cache::get(self::LAST_GOOD_KEY);
+
+            if ($lastGood && Carbon::parse($lastGood['fetched_at'])->gt(now()->subDay())) {
+                return $lastGood;
+            }
+
+            throw $e;
         }
     }
 
@@ -54,6 +69,7 @@ class ExchangeRates
     public function forget(): void
     {
         Cache::forget(self::CACHE_KEY);
+        Cache::forget(self::FAILURE_KEY);
     }
 
     private function fetch(): array
