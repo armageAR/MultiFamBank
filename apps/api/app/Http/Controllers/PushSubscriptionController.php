@@ -71,10 +71,10 @@ class PushSubscriptionController extends Controller
                 'message' => $result['failed'] > 0
                     ? 'El servicio de notificaciones rechazó el envío. Desactivá y volvé a activar las notificaciones en este dispositivo.'
                     : 'No hay ningún dispositivo registrado para tu usuario. Volvé a activar las notificaciones.',
-                'data' => $result,
+                'data' => ['sent' => $result['sent'], 'failed' => $result['failed']],
             ], 422);
         }
 
-        return response()->json(['message' => 'Notificación enviada.', 'data' => $result]);
+        return response()->json(['message' => 'Notificación enviada.', 'data' => ['sent' => $result['sent'], 'failed' => $result['failed']]]);
     }
 }

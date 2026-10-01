@@ -297,5 +297,11 @@ class OperationsTest extends TestCase
         cache()->forget('exchange_rates.latest');
 
         $this->ask(['type' => 'savings_deposit', 'amount_ars' => '1100'])->assertCreated()->assertJsonPath('data.exchange_rate', '1100.0000');
+
+        // A fallback older than a day is not used.
+        $this->travel(25)->hours();
+        cache()->forget('exchange_rates.latest');
+        cache()->forget('exchange_rates.failing');
+        $this->ask(['type' => 'savings_deposit', 'amount_ars' => '1100'])->assertJsonValidationErrors('exchange_rate');
     }
 }
