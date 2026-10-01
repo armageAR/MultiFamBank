@@ -19,7 +19,7 @@ export function AcceptInvitation() {
   if (invitation.isPending) {
     return (
       <AuthLayout appName="Administración" title="Invitación">
-        <p className="text-center text-sm text-gray-400">Cargando invitación…</p>
+        <p className="text-center text-sm text-gray-500">Cargando invitación…</p>
       </AuthLayout>
     )
   }

@@ -26,12 +26,23 @@ return new class extends Migration
         });
 
         Schema::table('money_requests', function (Blueprint $table) {
-            $table->string('requested_type')->after('type');
+            $table->string('requested_type')->nullable()->after('type');
             $table->text('requested_description')->nullable()->after('requested_amount_ars');
             // When the money changed hands. Set at confirmation unless the administrator chose a date;
             // editable afterwards. Reports group by this date.
             $table->timestamp('occurred_at')->nullable()->after('description');
             $table->index(['bank_id', 'occurred_at']);
+        });
+
+        // Existing rows, if any: the original request equals the current values.
+        DB::table('money_requests')->update([
+            'requested_type' => DB::raw('type'),
+            'requested_description' => DB::raw('description'),
+        ]);
+        DB::table('money_requests')->whereNotNull('confirmed_at')->update(['occurred_at' => DB::raw('confirmed_at')]);
+
+        Schema::table('money_requests', function (Blueprint $table) {
+            $table->string('requested_type')->nullable(false)->change();
         });
 
         Schema::table('ledger_entries', function (Blueprint $table) {

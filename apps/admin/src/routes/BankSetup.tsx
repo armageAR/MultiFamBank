@@ -11,7 +11,7 @@ export function BankSetup() {
   const { user, isLoading } = useAuth()
   const bank = useQuery({ queryKey: ['admin-bank'], queryFn: () => fetchAdminBank(api), enabled: Boolean(user?.administered_bank) })
 
-  if (isLoading) return <p className="p-6 text-center text-sm text-gray-400">Cargando…</p>
+  if (isLoading) return <p className="p-6 text-center text-sm text-gray-500">Cargando…</p>
   if (!user) return <Navigate to="/ingresar" replace />
   // Paused banks are read-only; the home page explains why.
   if (!user.administered_bank || user.administered_bank.status === 'paused') return <Navigate to="/" replace />
@@ -19,7 +19,7 @@ export function BankSetup() {
   return (
     <AuthLayout appName="Administración" title="Datos de tu banco">
       {bank.isPending ? (
-        <p className="text-center text-sm text-gray-400">Cargando…</p>
+        <p className="text-center text-sm text-gray-500">Cargando…</p>
       ) : bank.isError ? (
         <Alert tone="error">{toApiError(bank.error).message}</Alert>
       ) : (

@@ -25,7 +25,7 @@ export function AuthLayout({ appName, title, children }: { appName: string; titl
           <div className="w-full max-w-sm">
             <div className="mb-8 flex flex-col items-center text-center">
               <img src="/favicon.svg" alt="" className="mb-3 size-14 rounded-2xl shadow-lg shadow-emerald-600/20" />
-              <p className="mb-1 text-xs tracking-[0.3em] text-gray-400 uppercase">MultiFamBank</p>
+              <p className="mb-1 text-xs tracking-[0.3em] text-gray-500 uppercase">MultiFamBank</p>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <h1 className="text-2xl font-bold tracking-tight text-gray-900">{title}</h1>
                 <EnvironmentBadge />

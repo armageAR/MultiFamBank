@@ -16,12 +16,15 @@ interface FamilyShellProps {
 export function FamilyShell({ eyebrow, name, badge, actions, children }: FamilyShellProps) {
   return (
     <div className="flex min-h-dvh flex-col bg-gray-50 font-sans text-gray-900">
+      <h1 className="sr-only">
+        {name} · {eyebrow}
+      </h1>
       <header className={`border-b border-gray-100 bg-white px-5 py-4 ${environmentLabel ? 'border-t-8 border-t-red-600' : ''}`}>
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <img src="/favicon.svg" alt="" className="size-9 shrink-0 rounded-xl" />
             <div className="min-w-0">
-              <p className="truncate text-xs tracking-[0.2em] text-gray-400 uppercase">{eyebrow}</p>
+              <p className="truncate text-xs tracking-[0.2em] text-gray-500 uppercase">{eyebrow}</p>
               <div className="mt-0.5 flex flex-wrap items-center gap-2">
                 <p className="text-sm font-semibold text-gray-900">{name}</p>
                 {badge && (
@@ -45,7 +48,7 @@ export function HeaderButton({ children, onClick }: { children: ReactNode; onCli
     <button
       type="button"
       onClick={onClick}
-      className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-400 transition-colors hover:border-gray-300 hover:text-gray-700"
+      className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700"
     >
       {children}
     </button>

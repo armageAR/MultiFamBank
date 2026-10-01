@@ -5,7 +5,7 @@ import { Link, Navigate } from 'react-router'
 export function BankHome() {
   const { user, isLoading, signOut } = useAuth()
 
-  if (isLoading) return <p className="p-6 text-center text-sm text-gray-400">Cargando…</p>
+  if (isLoading) return <p className="p-6 text-center text-sm text-gray-500">Cargando…</p>
   if (!user) return <Navigate to="/ingresar" replace />
 
   const bank = user.administered_bank
@@ -45,7 +45,7 @@ export function BankHome() {
             </div>
           </div>
           {bank.status === 'active' && (
-            <Link to="/configurar-banco" className="text-xs text-gray-400 transition-colors hover:text-emerald-600">
+            <Link to="/configurar-banco" className="text-xs text-gray-500 transition-colors hover:text-emerald-600">
               editar datos
             </Link>
           )}
