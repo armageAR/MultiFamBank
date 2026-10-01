@@ -29,10 +29,17 @@ class ClientController extends Controller
         $pending = MoneyRequest::where('bank_id', $bank->id)->where('status', MoneyRequestStatus::Pending)
             ->selectRaw('bank_membership_id, count(*) as total')->groupBy('bank_membership_id')->pluck('total', 'bank_membership_id');
 
-        $clients = $bank->memberships()->with(['user', 'savingsAccount'])->get()
+        $memberships = $bank->memberships()->with(['user', 'savingsAccount'])->get();
+        $userIds = $memberships->pluck('user_id');
+        // People who also use another bank (or administer one): one query each instead of per client.
+        $elsewhere = BankMembership::whereIn('user_id', $userIds)->where('bank_id', '!=', $bank->id)->pluck('user_id')
+            ->merge(Bank::whereIn('admin_user_id', $userIds)->pluck('admin_user_id'))
+            ->flip();
+
+        $clients = $memberships
             ->sortBy(fn ($m) => [$m->status === MembershipStatus::Active ? 0 : 1, mb_strtolower($m->user->name)])
             ->values()
-            ->map(fn (BankMembership $m) => $this->presentClient($m, (int) ($pending[$m->id] ?? 0)));
+            ->map(fn (BankMembership $m) => $this->presentClient($m, (int) ($pending[$m->id] ?? 0), ! $m->user->is_superadmin && ! $elsewhere->has($m->user_id)));
 
         $invitations = $bank->invitations()
             ->where('type', InvitationType::BankClient)->whereNull('accepted_at')->whereNull('revoked_at')
@@ -134,7 +141,7 @@ class ClientController extends Controller
         return response()->json(['data' => new MoneyRequestResource($operation->load('membership.user'))], 201);
     }
 
-    private function presentClient(BankMembership $membership, ?int $pendingRequests = null): array
+    private function presentClient(BankMembership $membership, ?int $pendingRequests = null, ?bool $manageable = null): array
     {
         $account = $membership->savingsAccount;
 
@@ -150,7 +157,7 @@ class ClientController extends Controller
             'available_usd' => $account ? $account->availableUsd() : '0.00',
             'pending_requests' => $pendingRequests ?? MoneyRequest::where('bank_membership_id', $membership->id)->where('status', MoneyRequestStatus::Pending)->count(),
             // The administrator may edit identity and password only for people who use no other bank.
-            'manageable' => $this->clients->managedOnlyHere($membership, $membership->user),
+            'manageable' => $manageable ?? $this->clients->managedOnlyHere($membership, $membership->user),
         ];
     }
 

@@ -120,7 +120,10 @@ class ClientManagement
                 $user->forceFill(['name' => $name, 'email' => $email])->save();
 
                 if ($emailChanged) {
+                    // The admin vouches for the new address, but it is not verified by the person.
+                    $user->forceFill(['email_verified_at' => null])->save();
                     $user->tokens()->delete();
+                    app(PushNotifications::class)->forget($user);
                 }
 
                 AuditLog::record('client.updated', $user, $membership->bank_id, $before, ['name' => $name, 'email' => $email]);
@@ -142,6 +145,7 @@ class ClientManagement
 
             $user->forceFill(['password' => Hash::make($password)])->save();
             $user->tokens()->delete();
+            app(PushNotifications::class)->forget($user);
             Password::broker()->deleteToken($user);
 
             AuditLog::record('client.password_set', $user, $membership->bank_id);
@@ -151,7 +155,7 @@ class ClientManagement
     /** Sends the client a link to choose a new password; works for any client. */
     public function sendPasswordReset(BankMembership $membership): void
     {
-        $this->lockActive($membership->bank);
+        $this->assertActive($membership->bank);
         Password::sendResetLink(['email' => $membership->user->email]);
         AuditLog::record('client.password_reset_sent', $membership->user, $membership->bank_id);
     }
@@ -208,14 +212,18 @@ class ClientManagement
     private function lockActive(Bank $bank): Bank
     {
         $bank = Bank::whereKey($bank->id)->sharedLock()->firstOrFail();
+        $this->assertActive($bank);
 
+        return $bank;
+    }
+
+    private function assertActive(Bank $bank): void
+    {
         if ($bank->status !== BankStatus::Active) {
             throw new DomainRuleException('bank', $bank->status === BankStatus::Paused
                 ? 'Las operaciones del banco están pausadas. Comunicate con el administrador de la plataforma.'
                 : 'El banco no está disponible.');
         }
-
-        return $bank;
     }
 
     private function pendingClientInvitations(Bank $bank, string $email)

@@ -54,7 +54,7 @@ class BankReports
                 'amount_ars' => (string) $e->amount_ars,
                 'description' => $e->description,
             ])->values(),
-        ])->sortByDesc(fn ($client) => (float) $client['total_ars'])->values();
+        ])->sort(fn ($a, $b) => bccomp($b['total_ars'], $a['total_ars'], 2))->values();
 
         return [
             'month' => $month,
@@ -81,8 +81,10 @@ class BankReports
 
     private function sum(Bank $bank, LedgerEntryKind $kind, Carbon $from, Carbon $to, string $column): string
     {
-        $total = LedgerEntry::where('bank_id', $bank->id)->where('kind', $kind)->whereBetween('occurred_at', [$from, $to])->sum($column);
+        $total = LedgerEntry::where('bank_id', $bank->id)->where('kind', $kind)->whereBetween('occurred_at', [$from, $to])
+            ->toBase()->selectRaw("coalesce(sum($column), 0) as total")->value('total');
 
-        return number_format((float) $total, 2, '.', '');
+        // Decimal string straight from the database; no float conversion.
+        return bcadd((string) $total, '0', 2);
     }
 }

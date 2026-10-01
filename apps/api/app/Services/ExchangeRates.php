@@ -18,6 +18,8 @@ class ExchangeRates
 
     private const CACHE_SECONDS = 300;
 
+    private const LAST_GOOD_KEY = 'exchange_rates.last_good';
+
     /**
      * @return array{blue: array{buy: string, sell: string}, oficial: array{buy: string, sell: string}, fetched_at: string}
      *
@@ -25,7 +27,17 @@ class ExchangeRates
      */
     public function latest(): array
     {
-        return Cache::remember(self::CACHE_KEY, self::CACHE_SECONDS, fn () => $this->fetch());
+        try {
+            return Cache::remember(self::CACHE_KEY, self::CACHE_SECONDS, function () {
+                $rates = $this->fetch();
+                Cache::forever(self::LAST_GOOD_KEY, $rates);
+
+                return $rates;
+            });
+        } catch (ExchangeRateUnavailableException $e) {
+            // Bluelytics is down: the last quote we got is better than blocking every request.
+            return Cache::get(self::LAST_GOOD_KEY) ?? throw $e;
+        }
     }
 
     /**
@@ -55,8 +67,10 @@ class ExchangeRates
                 'sell' => number_format((float) $response->json("$type.value_sell"), 2, '.', ''),
             ];
 
-            if (! $response->json('blue.value_buy') || ! $response->json('oficial.value_buy')) {
-                throw new ExchangeRateUnavailableException('Respuesta sin cotizaciones.');
+            foreach (['blue.value_buy', 'blue.value_sell', 'oficial.value_buy', 'oficial.value_sell'] as $field) {
+                if (! is_numeric($response->json($field)) || $response->json($field) <= 0) {
+                    throw new ExchangeRateUnavailableException("Cotización inválida: $field.");
+                }
             }
 
             return [
