@@ -13,7 +13,8 @@ export function BankSetup() {
 
   if (isLoading) return <p className="p-6 text-center text-slate-500">Cargando…</p>
   if (!user) return <Navigate to="/ingresar" replace />
-  if (!user.administered_bank) return <Navigate to="/" replace />
+  // Paused banks are read-only; the home page explains why.
+  if (!user.administered_bank || user.administered_bank.status === 'paused') return <Navigate to="/" replace />
 
   return (
     <AuthLayout appName="Administración" title="Datos de tu banco">

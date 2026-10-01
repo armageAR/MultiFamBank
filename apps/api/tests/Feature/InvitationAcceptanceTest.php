@@ -137,7 +137,7 @@ class InvitationAcceptanceTest extends TestCase
 
         $this->postJson("/api/invitations/$token/accept", [
             'name' => 'Laura', 'password' => 'clave-segura-1', 'password_confirmation' => 'clave-segura-1',
-        ])->assertJsonValidationErrors('token');
+        ])->assertNotFound();
 
         $this->assertSame(0, User::count());
     }

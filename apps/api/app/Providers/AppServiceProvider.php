@@ -22,7 +22,7 @@ class AppServiceProvider extends ServiceProvider
         ResetPassword::createUrlUsing(function (User $user, string $token): string {
             $app = match (true) {
                 $user->is_superadmin => 'superadmin',
-                $user->administeredBank()->exists() => 'admin',
+                $user->accessibleAdministeredBank()->exists() => 'admin',
                 default => 'client',
             };
 

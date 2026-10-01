@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\PlatformBankDetailResource;
 use App\Http\Resources\PlatformBankResource;
 use App\Models\Bank;
+use App\Services\BankLifecycle;
 use App\Services\BankProvisioning;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -87,6 +88,16 @@ class BankController extends Controller
         $provisioning->setAdministratorPassword($bank, $data['password']);
 
         return response()->json(['message' => 'Contraseña actualizada. El administrador tiene que volver a ingresar.']);
+    }
+
+    /** pause | resume | deactivate | reactivate */
+    public function changeStatus(Request $request, Bank $bank, BankLifecycle $lifecycle): PlatformBankDetailResource
+    {
+        $action = $request->validate(['action' => ['required', Rule::in(['pause', 'resume', 'deactivate', 'reactivate'])]])['action'];
+
+        $bank = $lifecycle->{$action}($bank);
+
+        return new PlatformBankDetailResource($bank->fresh(['admin', 'adminInvitation', 'memberships.user']));
     }
 
     /** Issues a new administrator invitation; earlier links stop working. */

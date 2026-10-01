@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\BankStatus;
 use App\Enums\InvitationType;
 use App\Http\Resources\UserResource;
 use App\Models\Invitation;
@@ -20,8 +21,7 @@ class InvitationController extends Controller
      */
     public function show(string $token): JsonResponse
     {
-        $invitation = Invitation::findByToken($token);
-        abort_unless($invitation !== null, 404, 'La invitación no existe.');
+        $invitation = $this->findVisible($token);
 
         return response()->json([
             'type' => $invitation->type->value,
@@ -38,11 +38,19 @@ class InvitationController extends Controller
         ]);
     }
 
+    /** Invitations to a deactivated bank behave as if they did not exist. */
+    private function findVisible(string $token): Invitation
+    {
+        $invitation = Invitation::findByToken($token);
+        abort_unless($invitation !== null && $invitation->bank->status !== BankStatus::Deactivated, 404, 'La invitación no existe.');
+
+        return $invitation;
+    }
+
     /** @unauthenticated */
     public function accept(Request $request, string $token, InvitationAcceptance $acceptance): JsonResponse
     {
-        $invitation = Invitation::findByToken($token);
-        abort_unless($invitation !== null, 404, 'La invitación no existe.');
+        $invitation = $this->findVisible($token);
 
         $isNewUser = ! User::where('email', $invitation->email)->exists();
 

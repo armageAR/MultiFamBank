@@ -35,6 +35,7 @@ Route::prefix('platform')->middleware(['auth:sanctum', EnsureSuperadmin::class])
     Route::post('/banks', [PlatformBankController::class, 'store']);
     Route::get('/banks/{bank}', [PlatformBankController::class, 'show']);
     Route::patch('/banks/{bank}/admin', [PlatformBankController::class, 'updateAdmin']);
+    Route::post('/banks/{bank}/status', [PlatformBankController::class, 'changeStatus']);
     Route::put('/banks/{bank}/admin/password', [PlatformBankController::class, 'setAdminPassword']);
     Route::post('/banks/{bank}/admin-invitation', [PlatformBankController::class, 'resendInvitation']);
 });

@@ -30,6 +30,8 @@ class PlatformBankResource extends JsonResource
             ] : null,
             'created_at' => $this->created_at,
             'activated_at' => $this->activated_at,
+            'paused_at' => $this->paused_at,
+            'deactivated_at' => $this->deactivated_at,
         ];
     }
 }

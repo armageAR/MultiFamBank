@@ -4,7 +4,7 @@ MultiFamBank is the next version of [FamBank](https://github.com/armageAR/famban
 
 Each family operates an independent **bank**, with its own administrator, clients, savings accounts, requests, and expense reports. Clients can belong to multiple banks, while a person can administer only one bank.
 
-> **Project status:** The monorepo is deployed to Railway. Implemented so far: the full database schema, sign-in and password reset, the platform superadmin application (bank list, bank creation with an administrator invitation, invitation resend, and a bank detail view to manage the administrator and see clients), and invitation acceptance plus bank setup in the administrator application. Client features, requests, confirmations, and reports are planned, not implemented yet. The original FamBank repository contains the first working version.
+> **Project status:** The monorepo is deployed to Railway. Implemented so far: the full database schema, sign-in and password reset, the platform superadmin application (bank list, bank creation with an administrator invitation, invitation resend, a bank detail view to manage the administrator and see clients, and pausing, deactivating, and reactivating banks), and invitation acceptance plus bank setup in the administrator application. Client features, requests, confirmations, and reports are planned, not implemented yet. The original FamBank repository contains the first working version.
 
 In this project, “bank” means a private family ledger. MultiFamBank does not hold money, transfer funds, execute currency exchange, or provide banking services. Administrators record money received or delivered outside the application.
 
@@ -75,8 +75,10 @@ A client with one bank enters that bank directly. A client with multiple banks u
 | --- | --- |
 | Pending configuration | The administrator must accept the invitation and complete bank setup before financial operations are available. |
 | Active | Normal client and administrator operations are enabled. |
-| Paused | Existing information remains readable, but new financial requests and confirmations are blocked. |
-| Deactivated | Financial operations are blocked and historical records are retained. Deactivation is logical, not deletion of the ledger. |
+| Paused | Read-only: the administrator and clients still see the bank and its history, with a notice that operations are paused and whom to contact. New financial requests, confirmations, and bank edits are blocked. The superadmin resumes it. Only an active bank can be paused. |
+| Deactivated | For its administrator and clients the bank no longer exists: it disappears from their applications and its invitation links return "not found". They can still sign in, because their identity is global. Records are retained, nothing is deleted, and the administrator's email stays reserved. The superadmin can reactivate it, which returns it to active (or to pending configuration if it was never set up). |
+
+The superadmin pauses, resumes, deactivates, and reactivates banks from the bank detail view; every change is recorded in the audit log.
 
 The server checks bank status on every financial write, including synchronization of requests prepared offline. An offline request cannot bypass a pause or deactivation.
 

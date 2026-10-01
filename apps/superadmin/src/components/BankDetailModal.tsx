@@ -1,9 +1,11 @@
 import {
+  changePlatformBankStatus,
   fetchPlatformBank,
   setPlatformBankAdminPassword,
   toApiError,
   updatePlatformBankAdmin,
   type ApiError,
+  type BankLifecycleAction,
   type PlatformBankDetail,
   type UpdateAdminResponse,
 } from '@multifambank/api-client'
@@ -43,18 +45,111 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
+const lifecycleActions: Record<
+  BankLifecycleAction,
+  { label: string; variant: 'secondary' | 'danger'; confirm?: string; done: string }
+> = {
+  pause: {
+    label: 'Pausar',
+    variant: 'secondary',
+    confirm:
+      'El administrador y los clientes van a poder ver sus datos, pero no operar. Van a ver un aviso de que las operaciones del banco están pausadas.',
+    done: 'Banco pausado.',
+  },
+  resume: { label: 'Reanudar', variant: 'secondary', done: 'Banco reanudado: las operaciones vuelven a estar habilitadas.' },
+  deactivate: {
+    label: 'Desactivar',
+    variant: 'danger',
+    confirm:
+      'El administrador y los clientes dejan de tener acceso, como si el banco no existiera. Los datos se conservan, el email del administrador sigue reservado y podés reactivarlo cuando quieras.',
+    done: 'Banco desactivado.',
+  },
+  reactivate: { label: 'Reactivar', variant: 'secondary', done: 'Banco reactivado: el administrador y los clientes vuelven a tener acceso.' },
+}
+
+const availableActions: Record<PlatformBankDetail['status'], BankLifecycleAction[]> = {
+  pending_configuration: ['deactivate'],
+  active: ['pause', 'deactivate'],
+  paused: ['resume', 'deactivate'],
+  deactivated: ['reactivate'],
+}
+
 function BankSection({ bank }: { bank: PlatformBankDetail }) {
+  const queryClient = useQueryClient()
+  const [confirming, setConfirming] = useState<BankLifecycleAction | null>(null)
+  const [running, setRunning] = useState<BankLifecycleAction | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [error, setError] = useState<ApiError | null>(null)
+
+  async function run(action: BankLifecycleAction) {
+    setRunning(action)
+    setError(null)
+    try {
+      const updated = await changePlatformBankStatus(api, bank.id, action)
+      queryClient.setQueryData(['platform-bank', bank.id], updated)
+      await queryClient.invalidateQueries({ queryKey: ['platform-banks'] })
+      setNotice(lifecycleActions[action].done)
+      setConfirming(null)
+    } catch (err) {
+      setError(toApiError(err))
+      // The status may have changed elsewhere (another tab); show the current one.
+      setConfirming(null)
+      await queryClient.invalidateQueries({ queryKey: ['platform-bank', bank.id] })
+    } finally {
+      setRunning(null)
+    }
+  }
+
+  function start(action: BankLifecycleAction) {
+    setNotice(null)
+    setError(null)
+    if (lifecycleActions[action].confirm) setConfirming(action)
+    else void run(action)
+  }
+
   return (
     <Card title="Banco">
-      <dl className="grid gap-4 sm:grid-cols-2">
-        <Field label="Nombre">{bank.name ?? <span className="text-slate-500 italic">Sin configurar</span>}</Field>
-        <Field label="Estado">
-          <BankStatusBadge status={bank.status} />
-        </Field>
-        <Field label="Zona horaria">{bank.timezone.replaceAll('_', ' ')}</Field>
-        <Field label="Creado">{formatDate(bank.created_at)}</Field>
-        <Field label="Activado">{formatDate(bank.activated_at)}</Field>
-      </dl>
+      <div className="space-y-4">
+        {notice && <Alert tone="success">{notice}</Alert>}
+        {error && <Alert tone="error">{error.message}</Alert>}
+        <dl className="grid gap-4 sm:grid-cols-2">
+          <Field label="Nombre">{bank.name ?? <span className="text-slate-500 italic">Sin configurar</span>}</Field>
+          <Field label="Estado">
+            <BankStatusBadge status={bank.status} />
+            {bank.status === 'paused' && <span className="ml-2 text-sm text-slate-600">desde el {formatDate(bank.paused_at)}</span>}
+            {bank.status === 'deactivated' && (
+              <span className="ml-2 text-sm text-slate-600">desde el {formatDate(bank.deactivated_at)}</span>
+            )}
+          </Field>
+          <Field label="Zona horaria">{bank.timezone.replaceAll('_', ' ')}</Field>
+          <Field label="Creado">{formatDate(bank.created_at)}</Field>
+          <Field label="Activado">{formatDate(bank.activated_at)}</Field>
+        </dl>
+
+        {confirming ? (
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <Alert tone={confirming === 'deactivate' ? 'error' : 'warning'} title={`¿${lifecycleActions[confirming].label} ${bank.name ?? 'este banco'}?`}>
+              {lifecycleActions[confirming].confirm}
+            </Alert>
+            <div className="flex flex-wrap gap-2">
+              <Button variant={lifecycleActions[confirming].variant === 'danger' ? 'danger' : 'primary'} loading={running === confirming} onClick={() => run(confirming)}>
+                Sí, {lifecycleActions[confirming].label.toLowerCase()}
+              </Button>
+              <Button variant="secondary" onClick={() => setConfirming(null)}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {availableActions[bank.status].map((action) => (
+              <Button key={action} variant={lifecycleActions[action].variant} loading={running === action} onClick={() => start(action)}>
+                {lifecycleActions[action].label}
+              </Button>
+            ))}
+          </div>
+        )}
+      </div>
     </Card>
   )
 }
