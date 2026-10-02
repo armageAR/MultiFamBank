@@ -77,16 +77,35 @@ export function usePushNotifications(api: AxiosInstance) {
     }
   }, [api, check])
 
+  const unsubscribe = useCallback(async () => {
+    setMessage(null)
+    setStatus('loading')
+    await forgetPushSubscription(api)
+    setStatus('unsubscribed')
+    setMessage('Notificaciones desactivadas en este dispositivo.')
+  }, [api])
+
   const test = useCallback(async () => {
     setMessage(null)
     try {
       setMessage(await sendTestPush(api))
     } catch (error) {
-      setMessage(toApiError(error).message)
-    }
-  }, [api])
+      const failure = toApiError(error)
+      if (failure.status !== 410) return setMessage(failure.message)
 
-  return { status, message, subscribe, test, dismiss: () => setMessage(null) }
+      // The push service invalidated this device's subscription (reinstall, cleared data…):
+      // renew it and try again, so nobody has to deactivate and reactivate by hand.
+      await forgetPushSubscription()
+      await subscribe()
+      try {
+        setMessage(await sendTestPush(api))
+      } catch (retryError) {
+        setMessage(toApiError(retryError).message)
+      }
+    }
+  }, [api, subscribe])
+
+  return { status, message, subscribe, unsubscribe, test, dismiss: () => setMessage(null) }
 }
 
 /** Removes this device's subscription so the next person signing in does not get the previous user's notifications. */

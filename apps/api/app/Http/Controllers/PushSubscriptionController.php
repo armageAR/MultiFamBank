@@ -65,6 +65,15 @@ class PushSubscriptionController extends Controller
             'tag' => 'test',
         ]);
 
+        if ($result['sent'] === 0 && $result['expired'] > 0) {
+            // The push service invalidated this device's subscription (e.g. after reinstalling the app):
+            // the app renews it on its own.
+            return response()->json([
+                'message' => 'La suscripción de este dispositivo venció. La estamos renovando.',
+                'code' => 'subscription_expired',
+            ], 410);
+        }
+
         if ($result['sent'] === 0) {
             return response()->json([
                 // The push service's reply is logged, never echoed back.
