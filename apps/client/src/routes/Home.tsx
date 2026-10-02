@@ -1,4 +1,4 @@
-import { cancelMyOperation, fetchClientBanks, fetchMyOperations, toApiError, type ClientBank, type Operation } from '@multifambank/api-client'
+import { cancelMyOperation, fetchClientBanks, fetchExchangeRates, fetchMyOperations, toApiError, type ClientBank, type Operation } from '@multifambank/api-client'
 import { PushControls, useAuth, useOnline } from '@multifambank/auth'
 import {
   Alert,
@@ -15,15 +15,25 @@ import {
   OperationTypeBadge,
 } from '@multifambank/ui'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router'
+import type { OutboxRequest } from '@multifambank/offline'
 import { api } from '../api'
-import { NewRequestModal } from '../NewRequestModal'
+import { AccountModal } from '../components/AccountModal'
+import { NewRequestModal } from '../components/NewRequestModal'
+import { QuotesCard } from '../components/QuotesCard'
+import { useOutbox } from '../outbox'
 
-function OperationRow({ operation, bankId, readOnly }: { operation: Operation; bankId: number; readOnly: boolean }) {
+function OperationRow({ operation, bankId, readOnly, highlighted }: { operation: Operation; bankId: number; readOnly: boolean; highlighted: boolean }) {
   const queryClient = useQueryClient()
   const [error, setError] = useState<string | null>(null)
   const { requested } = operation
+  const row = useRef<HTMLLIElement>(null)
+
+  // Opened from a notification: bring the operation into view.
+  useEffect(() => {
+    if (highlighted) row.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [highlighted])
 
   async function cancel() {
     try {
@@ -35,7 +45,10 @@ function OperationRow({ operation, bankId, readOnly }: { operation: Operation; b
   }
 
   return (
-    <li className="flex flex-col gap-1 border-b border-gray-100 py-3 last:border-0">
+    <li
+      ref={row}
+      className={`flex flex-col gap-1 border-b border-gray-100 py-3 last:border-0 ${highlighted ? '-mx-2 rounded-xl bg-emerald-50 px-2 ring-2 ring-emerald-300' : ''}`}
+    >
       <div className="flex items-center justify-between gap-2">
         <OperationTypeBadge type={operation.type} audience="client" />
         <OperationStatusBadge status={operation.status} />
@@ -66,14 +79,56 @@ function OperationRow({ operation, bankId, readOnly }: { operation: Operation; b
   )
 }
 
-function BankView({ membership, banks, onSwitch }: { membership: ClientBank; banks: ClientBank[]; onSwitch: (id: number) => void }) {
+/** A request saved on this device: waiting for a connection, or refused by the server with a reason. */
+function OutboxRow({ item, onDiscard }: { item: OutboxRequest; onDiscard: (item: OutboxRequest) => void }) {
+  const rejected = item.state === 'rejected'
+
+  return (
+    <li className="flex flex-col gap-1 border-b border-gray-100 py-3 last:border-0">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <OperationTypeBadge type={item.payload.type} audience="client" />
+        <span
+          className={`inline-flex rounded-md border px-1.5 py-0.5 text-xs whitespace-nowrap ${rejected ? 'border-red-200 bg-red-50 text-red-600' : 'border-sky-200 bg-sky-50 text-sky-700'}`}
+        >
+          {rejected ? 'No se pudo enviar' : 'Pendiente de sincronización'}
+        </span>
+      </div>
+      <p className="text-base font-semibold text-gray-900">{formatArs(item.payload.amount_ars)}</p>
+      {item.payload.description && <p className="text-sm text-gray-700">{item.payload.description}</p>}
+      {rejected && <p className="text-xs text-red-600">{item.lastError}</p>}
+      <div className="flex items-center justify-between text-xs text-gray-500">
+        <span>Guardado el {formatDateTime(item.createdAt)} en este dispositivo</span>
+        <button type="button" onClick={() => onDiscard(item)} className="text-red-600 hover:underline">
+          descartar
+        </button>
+      </div>
+    </li>
+  )
+}
+
+interface BankViewProps {
+  membership: ClientBank
+  banks: ClientBank[]
+  syncedAt: number
+  highlightedOperation: string | null
+  onSwitch: (id: number) => void
+}
+
+function BankView({ membership, banks, syncedAt, highlightedOperation, onSwitch }: BankViewProps) {
   const { user, signOut } = useAuth()
   const online = useOnline()
   const [asking, setAsking] = useState(false)
+  const [account, setAccount] = useState(false)
   const bankId = membership.bank.id
+  const rates = useQuery({ queryKey: ['exchange-rates'], queryFn: () => fetchExchangeRates(api), staleTime: 5 * 60_000, retry: false })
+  const balanceArs = rates.data ? Number(membership.balance_usd) * Number(rates.data.blue.buy) : null
   const operations = useQuery({ queryKey: ['client', 'operations', bankId], queryFn: () => fetchMyOperations(api, bankId) })
   const paused = membership.bank.status === 'paused'
-  const readOnly = paused || !online
+  // Offline, requests can still be prepared (they wait in the outbox); a paused bank takes none.
+  const readOnly = paused
+  const outbox = useOutbox(user!.id, bankId)
+  const queued = outbox.items.filter((item) => item.state === 'queued').length
+  const [notice, setNotice] = useState<string | null>(null)
 
   return (
     <FamilyShell
@@ -82,54 +137,124 @@ function BankView({ membership, banks, onSwitch }: { membership: ClientBank; ban
       actions={
         <>
           <PushControls api={api} />
+          <HeaderButton onClick={() => setAccount(true)}>Mi cuenta</HeaderButton>
           <HeaderButton onClick={signOut}>Salir</HeaderButton>
         </>
       }
     >
-      {!online && <Alert tone="warning">Sin conexión: ves los últimos datos descargados. Para pedir plata hace falta internet.</Alert>}
+      {!online && (
+        <Alert tone="warning">
+          Sin conexión: ves los datos descargados el {formatDateTime(new Date(syncedAt).toISOString())}. Los saldos pueden haber cambiado.
+          Podés preparar pedidos: se envían solos cuando vuelva la conexión.
+        </Alert>
+      )}
+      {notice && (
+        <Alert tone="info">
+          <div className="flex items-start justify-between gap-3">
+            <span>{notice}</span>
+            <button type="button" aria-label="Cerrar" onClick={() => setNotice(null)}>
+              ✕
+            </button>
+          </div>
+        </Alert>
+      )}
+      {queued > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800">
+          <span>
+            {queued} pedido{queued > 1 ? 's' : ''} esperando para enviarse.
+          </span>
+          {online && (
+            <button type="button" onClick={outbox.sync} disabled={outbox.syncing} className="font-semibold hover:underline disabled:opacity-50">
+              {outbox.syncing ? 'Enviando…' : 'Sincronizar ahora'}
+            </button>
+          )}
+        </div>
+      )}
       {paused && <Alert tone="warning" title="Las operaciones del banco están pausadas">Comunicate con el administrador de tu banco.</Alert>}
       {banks.length > 1 && (
         <nav className="flex gap-1 overflow-x-auto rounded-xl border border-gray-100 bg-white p-1 shadow-sm" aria-label="Tus bancos">
-          {banks.map((b) => (
-            <button
-              key={b.bank.id}
-              type="button"
-              aria-current={b.bank.id === bankId ? 'page' : undefined}
-              onClick={() => onSwitch(b.bank.id)}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold whitespace-nowrap ${b.bank.id === bankId ? 'bg-emerald-600 text-white' : 'text-gray-500 hover:text-gray-900'}`}
-            >
-              {b.bank.name}
-            </button>
-          ))}
+          {banks.map((b) => {
+            const current = b.bank.id === bankId
+            return (
+              <button
+                key={b.bank.id}
+                type="button"
+                aria-current={current ? 'page' : undefined}
+                onClick={() => onSwitch(b.bank.id)}
+                className={`flex min-w-28 flex-1 flex-col rounded-lg px-3 py-2 text-left whitespace-nowrap ${current ? 'bg-emerald-600 text-white' : 'text-gray-500 hover:text-gray-900'}`}
+              >
+                <span className="text-sm font-semibold">{b.bank.name}</span>
+                <span className={`text-xs ${current ? 'text-emerald-50' : 'text-gray-500'}`}>
+                  {b.bank.status === 'paused' ? 'Pausado' : formatUsd(b.available_usd)}
+                </span>
+              </button>
+            )
+          })}
         </nav>
       )}
 
       <Card title="Mis ahorros">
-        <p className="text-3xl font-bold text-emerald-700">{formatUsd(membership.available_usd)}</p>
-        <p className="mt-1 text-xs text-gray-500">
-          Disponible{Number(membership.reserved_usd) > 0 ? ` · ${formatUsd(membership.reserved_usd)} reservados por retiros pendientes` : ''}
-        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl bg-emerald-50 px-4 py-3">
+            <p className="mb-1 text-xs text-emerald-700">Dólares</p>
+            <p className="text-xl font-bold text-emerald-700">{formatUsd(membership.balance_usd)}</p>
+          </div>
+          <div className="rounded-xl bg-gray-50 px-4 py-3">
+            <p className="mb-1 text-xs text-gray-500">Pesos (blue compra)</p>
+            <p className="text-xl font-bold text-gray-900">{balanceArs !== null ? formatArs(Math.round(balanceArs)) : '—'}</p>
+          </div>
+        </div>
+        {Number(membership.reserved_usd) > 0 && (
+          <p className="mt-3 text-xs text-gray-500">
+            {formatUsd(membership.reserved_usd)} reservados por retiros pendientes · disponible {formatUsd(membership.available_usd)}
+          </p>
+        )}
       </Card>
 
       {!readOnly && <Button onClick={() => setAsking(true)}>+ Nuevo pedido</Button>}
+
+      <QuotesCard rates={rates} />
 
       <Card title="Mis movimientos">
         {operations.isPending ? (
           <p className="text-sm text-gray-500">Cargando…</p>
         ) : operations.isError ? (
           <Alert tone="error">{toApiError(operations.error).message}</Alert>
-        ) : operations.data.data.length === 0 ? (
+        ) : operations.data.data.length === 0 && outbox.items.length === 0 ? (
           <p className="text-sm text-gray-500">Todavía no tenés movimientos.</p>
         ) : (
           <ul>
+            {outbox.items.map((item) => (
+              <OutboxRow key={item.id} item={item} onDiscard={outbox.discard} />
+            ))}
             {operations.data.data.map((operation) => (
-              <OperationRow key={operation.id} operation={operation} bankId={bankId} readOnly={readOnly} />
+              <OperationRow
+                key={operation.id}
+                operation={operation}
+                bankId={bankId}
+                readOnly={readOnly || !online}
+                highlighted={operation.id === highlightedOperation}
+              />
             ))}
           </ul>
         )}
       </Card>
 
-      {asking && !readOnly && <NewRequestModal bankId={bankId} onClose={() => setAsking(false)} />}
+      {asking && !readOnly && (
+        <NewRequestModal
+          bankId={bankId}
+          bankName={membership.bank.name ?? 'tu banco'}
+          rates={rates.data}
+          online={online}
+          enqueue={outbox.add}
+          onClose={() => setAsking(false)}
+          onQueued={() => {
+            setAsking(false)
+            setNotice('Pedido guardado en este dispositivo. Se envía solo cuando haya conexión.')
+          }}
+        />
+      )}
+      {account && user && <AccountModal user={user} onClose={() => setAccount(false)} />}
     </FamilyShell>
   )
 }
@@ -163,5 +288,14 @@ export function Home() {
 
   const selected = banks.data.find((b) => b.bank.id === Number(params.get('banco'))) ?? banks.data[0]
 
-  return <BankView membership={selected} banks={banks.data} onSwitch={(id) => setParams({ banco: String(id) }, { replace: true })} />
+  return (
+    <BankView
+      key={selected.bank.id}
+      membership={selected}
+      banks={banks.data}
+      syncedAt={banks.dataUpdatedAt}
+      highlightedOperation={params.get('operacion')}
+      onSwitch={(id) => setParams({ banco: String(id) }, { replace: true })}
+    />
+  )
 }

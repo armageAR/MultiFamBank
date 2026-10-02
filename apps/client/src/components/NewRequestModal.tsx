@@ -1,8 +1,8 @@
-import { requestOperation, toApiError, type ApiError, type OperationType } from '@multifambank/api-client'
-import { Alert, Button, Modal, operationLabels, parseAmount, TextField } from '@multifambank/ui'
+import { requestOperation, toApiError, type ApiError, type ExchangeRates, type OperationType } from '@multifambank/api-client'
+import { Alert, Button, formatNumber, formatUsd, Modal, operationLabels, parseAmount, TextField } from '@multifambank/ui'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRef, useState, type FormEvent } from 'react'
-import { api } from './api'
+import { api } from '../api'
 
 const choices: { type: OperationType; title: string; detail: string }[] = [
   { type: 'savings_deposit', title: 'Depositar', detail: 'Poner plata en mis ahorros' },
@@ -10,7 +10,18 @@ const choices: { type: OperationType; title: string; detail: string }[] = [
   { type: 'expense', title: 'Pedir para un gasto', detail: 'Dinero del banco, no de mis ahorros' },
 ]
 
-export function NewRequestModal({ bankId, onClose }: { bankId: number; onClose: () => void }) {
+interface Props {
+  bankId: number
+  bankName: string
+  rates?: ExchangeRates
+  online: boolean
+  /** Saves the request on this device to send it when there is a connection. */
+  enqueue: (id: string, payload: { type: OperationType; amount_ars: string; description: string | null }) => Promise<void>
+  onClose: () => void
+  onQueued: () => void
+}
+
+export function NewRequestModal({ bankId, bankName, rates, online, enqueue, onClose, onQueued }: Props) {
   const queryClient = useQueryClient()
   const [type, setType] = useState<OperationType>('savings_deposit')
   const [amount, setAmount] = useState('')
@@ -21,6 +32,10 @@ export function NewRequestModal({ bankId, onClose }: { bankId: number; onClose: 
   // it (the server answers with the request it already has); changing type or amount gets a new one.
   const attempt = useRef<{ content: string; id: string } | null>(null)
   const isExpense = type === 'expense'
+  // An estimate only: the server quotes again when the request is saved (as in FamBank).
+  const rate = isExpense || !rates ? null : type === 'savings_deposit' ? rates.blue.sell : rates.blue.buy
+  const parsedAmount = parseAmount(amount)
+  const estimate = rate && parsedAmount ? Number(parsedAmount) / Number(rate) : null
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -32,22 +47,35 @@ export function NewRequestModal({ bankId, onClose }: { bankId: number; onClose: 
 
     const content = `${type}|${parsed}|${description.trim()}`
     if (attempt.current?.content !== content) attempt.current = { content, id: crypto.randomUUID() }
+    const payload = { type, amount_ars: parsed, description: description.trim() || null }
 
     setLoading(true)
     setError(null)
     try {
-      await requestOperation(api, bankId, { id: attempt.current.id, type, amount_ars: parsed, description: description.trim() || null })
+      if (!online) {
+        await enqueue(attempt.current.id, payload)
+        onQueued()
+        return
+      }
+      await requestOperation(api, bankId, { id: attempt.current.id, ...payload })
       await queryClient.invalidateQueries({ queryKey: ['client'] })
       onClose()
     } catch (err) {
-      setError(toApiError(err))
+      const failure = toApiError(err)
+      if (failure.status === undefined) {
+        // The connection dropped: keep it on the device and send it later with the same id.
+        await enqueue(attempt.current.id, payload)
+        onQueued()
+        return
+      }
+      setError(failure)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <Modal title="Nuevo pedido" onClose={onClose}>
+    <Modal title={`Nuevo pedido · ${bankName}`} onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3" noValidate>
         <div className="grid gap-2" role="radiogroup" aria-label="Qué querés hacer">
           {choices.map((choice) => (
@@ -76,13 +104,23 @@ export function NewRequestModal({ bankId, onClose }: { bankId: number; onClose: 
           onChange={(e) => setDescription(e.target.value)}
           error={error?.fields.description}
         />
-        {!isExpense && <p className="text-xs text-gray-500">Se convierte a dólares con la cotización del momento; el administrador la confirma.</p>}
+        {!online && (
+          <Alert tone="warning">Sin conexión: el pedido queda guardado en este dispositivo y se envía solo cuando vuelvas a tener internet.</Alert>
+        )}
+        {!isExpense && (
+          <p className="rounded-xl bg-gray-50 px-4 py-3 text-xs text-gray-600">
+            {estimate !== null && rate
+              ? `≈ ${formatUsd(estimate)} a $ ${formatNumber(rate, 0)} (blue ${type === 'savings_deposit' ? 'venta' : 'compra'}). `
+              : ''}
+            La cotización definitiva se obtiene al grabar el pedido y el administrador la confirma.
+          </p>
+        )}
         <div className="flex gap-2">
           <Button type="button" variant="secondary" className="flex-1" onClick={onClose}>
             Cancelar
           </Button>
           <Button type="submit" className="flex-1" loading={loading}>
-            Enviar pedido
+            {online ? 'Enviar pedido' : 'Guardar para enviar'}
           </Button>
         </div>
       </form>

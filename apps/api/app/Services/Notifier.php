@@ -45,7 +45,7 @@ class Notifier
             'body' => ($confirmed ? 'Se confirmó ' : 'Se rechazó ').$this->what($request)
                 .($confirmed && $changed ? ' (con cambios del administrador)' : '')
                 .(! $confirmed && $request->rejection_reason ? ": {$request->rejection_reason}" : '.'),
-            'url' => config('multifambank.urls.client').'/?operacion='.$request->id,
+            'url' => $this->clientUrl($request),
             'tag' => 'request-'.$request->id,
         ]);
     }
@@ -57,7 +57,7 @@ class Notifier
         $this->later($request->membership->user, [
             'title' => 'Nueva operación',
             'body' => 'El administrador registró '.$this->what($request).'.',
-            'url' => config('multifambank.urls.client').'/?operacion='.$request->id,
+            'url' => $this->clientUrl($request),
             'tag' => 'request-'.$request->id,
         ]);
     }
@@ -69,9 +69,15 @@ class Notifier
         $this->later($request->membership->user, [
             'title' => 'Fecha de operación modificada',
             'body' => 'La fecha de '.$this->what($request).' ahora es el '.$request->occurred_at->timezone($request->bank->timezone)->format('d/m/Y').'.',
-            'url' => config('multifambank.urls.client').'/?operacion='.$request->id,
+            'url' => $this->clientUrl($request),
             'tag' => 'request-'.$request->id,
         ]);
+    }
+
+    /** Opens the client app on the operation's bank, with the operation highlighted. */
+    private function clientUrl(MoneyRequest $request): string
+    {
+        return config('multifambank.urls.client').'/?'.http_build_query(['banco' => $request->bank_id, 'operacion' => $request->id]);
     }
 
     private function what(MoneyRequest $request): string

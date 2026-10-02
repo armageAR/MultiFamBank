@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\OperationController as AdminOperationController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\Client\BankController as ClientBankController;
 use App\Http\Controllers\Client\OperationController as ClientOperationController;
 use App\Http\Controllers\ExchangeRateController;
@@ -40,6 +41,7 @@ Route::prefix('auth')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
+        Route::put('/profile', [ProfileController::class, 'update'])->middleware('throttle:10,1');
     });
 });
 

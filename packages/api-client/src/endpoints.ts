@@ -289,3 +289,12 @@ export async function cancelMyOperation(client: AxiosInstance, bankId: number, i
   const { data } = await client.post<{ data: Operation }>(`/client/banks/${bankId}/operations/${id}/cancel`)
   return data.data
 }
+
+/** Own email and/or password, confirmed with the current password. */
+export async function updateProfile(
+  client: AxiosInstance,
+  input: { current_password: string; email?: string; password?: string; password_confirmation?: string },
+): Promise<User> {
+  const { data } = await client.put<{ data: User }>('/auth/profile', input)
+  return data.data
+}
