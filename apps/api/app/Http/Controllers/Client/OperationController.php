@@ -27,7 +27,11 @@ class OperationController extends Controller
 
     public function store(Request $request, Notifier $notifier): JsonResponse
     {
-        $data = $request->validate(['id' => ['nullable', 'uuid']] + OperationRules::create());
+        $data = $request->validate([
+            'id' => ['nullable', 'uuid'],
+            // The quote the client was shown; accepted only if it is still the current one.
+            'exchange_rate' => ['nullable', ...OperationRules::rate()],
+        ] + OperationRules::create());
         $existed = isset($data['id']) && MoneyRequest::whereKey($data['id'])->exists();
 
         $operation = $this->operations->request($this->membership($request), $request->user(), $data);

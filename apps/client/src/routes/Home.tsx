@@ -28,7 +28,8 @@ import { Navigate, useSearchParams } from 'react-router'
 import type { OutboxRequest } from '@multifambank/offline'
 import { api } from '../api'
 import { AccountModal } from '../components/AccountModal'
-import { NewRequestModal } from '../components/NewRequestModal'
+import { ExpenseModal } from '../components/requests/ExpenseModal'
+import { SavingsModal } from '../components/requests/SavingsModal'
 import { QuotesCard } from '../components/QuotesCard'
 import { useOutbox } from '../outbox'
 
@@ -141,7 +142,7 @@ interface BankViewProps {
 function BankView({ membership, banks, syncedAt, highlightedOperation, onSwitch }: BankViewProps) {
   const { user, signOut } = useAuth()
   const online = useOnline()
-  const [asking, setAsking] = useState(false)
+  const [asking, setAsking] = useState<'deposit' | 'withdrawal' | 'expense' | null>(null)
   const [account, setAccount] = useState(false)
   const bankId = membership.bank.id
   const rates = useQuery({ queryKey: ['exchange-rates'], queryFn: () => fetchExchangeRates(api), staleTime: 5 * 60_000, retry: false })
@@ -154,6 +155,11 @@ function BankView({ membership, banks, syncedAt, highlightedOperation, onSwitch 
   const queued = outbox.queuedCount
   const [notice, setNotice] = useState<string | null>(null)
   const [confirmingExit, setConfirmingExit] = useState(false)
+
+  function queuedNotice() {
+    setAsking(null)
+    setNotice('Pedido guardado en este dispositivo. Se envía solo cuando haya conexión, con la cotización de ese momento.')
+  }
 
   // Unsent requests live only on this device and are wiped on sign-out: ask first.
   function exit() {
@@ -267,7 +273,17 @@ function BankView({ membership, banks, syncedAt, highlightedOperation, onSwitch 
         )}
       </Card>
 
-      {!readOnly && <Button onClick={() => setAsking(true)}>+ Nuevo pedido</Button>}
+      {!readOnly && (
+        <div className="grid grid-cols-2 gap-2">
+          <Button onClick={() => setAsking('deposit')}>Depositar</Button>
+          <Button variant="danger" onClick={() => setAsking('withdrawal')}>
+            Retirar
+          </Button>
+          <Button variant="warning" className="col-span-2" onClick={() => setAsking('expense')}>
+            Pedir dinero para un gasto
+          </Button>
+        </div>
+      )}
 
       <QuotesCard rates={rates} />
 
@@ -296,18 +312,29 @@ function BankView({ membership, banks, syncedAt, highlightedOperation, onSwitch 
         )}
       </Card>
 
-      {asking && !readOnly && (
-        <NewRequestModal
+      {(asking === 'deposit' || asking === 'withdrawal') && !readOnly && (
+        <SavingsModal
+          kind={asking}
           bankId={bankId}
           bankName={membership.bank.name ?? 'tu banco'}
+          availableUsd={membership.available_usd}
           rates={rates.data}
+          ratesUpdatedAt={rates.dataUpdatedAt}
           online={online}
           enqueue={outbox.add}
-          onClose={() => setAsking(false)}
-          onQueued={() => {
-            setAsking(false)
-            setNotice('Pedido guardado en este dispositivo. Se envía solo cuando haya conexión.')
-          }}
+          onRateChanged={() => void rates.refetch()}
+          onClose={() => setAsking(null)}
+          onQueued={queuedNotice}
+        />
+      )}
+      {asking === 'expense' && !readOnly && (
+        <ExpenseModal
+          bankId={bankId}
+          bankName={membership.bank.name ?? 'tu banco'}
+          online={online}
+          enqueue={outbox.add}
+          onClose={() => setAsking(null)}
+          onQueued={queuedNotice}
         />
       )}
       {account && user && <AccountModal user={user} onClose={() => setAccount(false)} />}
