@@ -21,13 +21,16 @@ export function environmentLabel(environment: AppEnvironment): string | null {
  */
 const navyBackground = '<rect width="64" height="64" rx="14" fill="#1e3a8a"/>'
 
-/** "navy" for the platform app; "emerald" matches the original FamBank in the family apps. */
-export type IconPalette = 'navy' | 'emerald'
+/** "navy" for the platform app, "emerald" (the original FamBank) for clients, "sky" (pastel) for bank administrators. */
+export type IconPalette = 'navy' | 'emerald' | 'sky'
 
 const backgrounds: Record<IconPalette, string> = {
   navy: navyBackground,
   emerald:
     '<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#34d399"/><stop offset="100%" stop-color="#059669"/></linearGradient></defs>' +
+    '<rect width="64" height="64" rx="14" fill="url(#bg)"/>',
+  sky:
+    '<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#9fd8f5"/><stop offset="100%" stop-color="#4fb0e3"/></linearGradient></defs>' +
     '<rect width="64" height="64" rx="14" fill="url(#bg)"/>',
 }
 
