@@ -61,6 +61,7 @@ class AdminClientsTest extends TestCase
     {
         config(['multifambank.expose_invitation_links' => true]);
         $first = $this->postJson('/api/admin/clients/invitations', ['email' => 'nico@example.com', 'name' => 'Nico'])->json('invitation_url');
+        $this->travel(Invitation::RESEND_COOLDOWN_MINUTES + 1)->minutes();
         $second = $this->postJson('/api/admin/clients/invitations', ['email' => 'nico@example.com', 'name' => 'Nico'])->json('invitation_url');
 
         $this->getJson('/api/invitations/'.basename($first))->assertJsonPath('state', 'revoked');
@@ -168,5 +169,21 @@ class AdminClientsTest extends TestCase
         $this->assertSame('110.00', $dashboard['balance_usd']);
         $this->assertSame(2, $dashboard['clients']);
         $this->assertSame('1000.00', $dashboard['exchange_rates']['blue']['buy']);
+    }
+
+    public function test_resending_waits_five_minutes_between_emails(): void
+    {
+        $created = $this->postJson('/api/admin/clients/invitations', ['email' => 'nico@example.com', 'name' => 'Nico'])
+            ->assertCreated()->json('data');
+        $this->assertNotNull($created['resend_available_at']);
+
+        $this->postJson("/api/admin/clients/invitations/{$created['id']}/resend")->assertJsonValidationErrors('invitation');
+        $this->postJson('/api/admin/clients/invitations', ['email' => 'nico@example.com', 'name' => 'Nico'])->assertJsonValidationErrors('invitation');
+        Mail::assertSentCount(1);
+
+        $this->travel(Invitation::RESEND_COOLDOWN_MINUTES)->minutes();
+        $this->travel(1)->seconds();
+        $this->postJson("/api/admin/clients/invitations/{$created['id']}/resend")->assertOk();
+        Mail::assertSentCount(2);
     }
 }

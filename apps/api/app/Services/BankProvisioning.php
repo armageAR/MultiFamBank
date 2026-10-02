@@ -86,6 +86,7 @@ class BankProvisioning
             }
 
             $previous = $bank->adminInvitation;
+            $previous?->assertResendAllowed();
 
             $this->revokePendingAdminInvitations($bank);
 

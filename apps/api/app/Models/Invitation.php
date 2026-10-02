@@ -3,13 +3,18 @@
 namespace App\Models;
 
 use App\Enums\InvitationType;
+use App\Exceptions\DomainRuleException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class Invitation extends Model
 {
+    /** A new link for the same person can be sent at most this often, so emails don't pile up. */
+    public const RESEND_COOLDOWN_MINUTES = 5;
+
     protected $fillable = [
         'type',
         'bank_id',
@@ -60,6 +65,22 @@ class Invitation extends Model
             $this->expires_at->isPast() => 'expired',
             default => 'pending',
         };
+    }
+
+    /** When another invitation to the same person may be sent. */
+    public function resendAvailableAt(): Carbon
+    {
+        return $this->created_at->copy()->addMinutes(self::RESEND_COOLDOWN_MINUTES);
+    }
+
+    /** @throws DomainRuleException while the previous invitation is too recent. */
+    public function assertResendAllowed(): void
+    {
+        if ($this->accepted_at === null && $this->revoked_at === null && $this->resendAvailableAt()->isFuture()) {
+            $minutes = (int) ceil(now()->diffInSeconds($this->resendAvailableAt()) / 60);
+
+            throw new DomainRuleException('invitation', "Ya se envió una invitación hace muy poco. Podés reenviarla en {$minutes} ".($minutes === 1 ? 'minuto' : 'minutos').'.');
+        }
     }
 
     public function isAcceptable(): bool

@@ -159,6 +159,12 @@ class PlatformBanksTest extends TestCase
         $bank = Bank::sole();
         $bank->adminInvitation->update(['expires_at' => now()->subDay()]);
 
+        // Too soon after the first email.
+        $this->travelBack();
+        $bank->adminInvitation->update(['created_at' => now()]);
+        $this->postJson("/api/platform/banks/{$bank->id}/admin-invitation")->assertJsonValidationErrors('invitation');
+        $this->travel(Invitation::RESEND_COOLDOWN_MINUTES + 1)->minutes();
+
         $response = $this->postJson("/api/platform/banks/{$bank->id}/admin-invitation");
 
         $response->assertOk()
