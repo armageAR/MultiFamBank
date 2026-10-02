@@ -158,7 +158,7 @@ function BankView({ membership, banks, syncedAt, highlightedOperation, onSwitch 
 
   function queuedNotice() {
     setAsking(null)
-    setNotice('Pedido guardado en este dispositivo. Se envía solo cuando haya conexión.')
+    setNotice('Pedido guardado en este dispositivo. Se envía solo cuando haya conexión, con la cotización de ese momento.')
   }
 
   // Unsent requests live only on this device and are wiped on sign-out: ask first.

@@ -24,8 +24,8 @@ interface Options {
 
 /**
  * Sends a request, or keeps it on the device when offline or when the connection drops. The id is
- * tied to the request's content: retrying the same request reuses it (the server answers with the
- * request it already has); changing anything gets a new one.
+ * tied to what the server compares on a retry (type and amount): retrying reuses it, so a request
+ * that was created but whose answer was lost comes back instead of being duplicated.
  */
 export function useRequestSubmit({ bankId, online, enqueue, onSent, onQueued, onRateChanged }: Options) {
   const queryClient = useQueryClient()
@@ -34,7 +34,7 @@ export function useRequestSubmit({ bankId, online, enqueue, onSent, onQueued, on
   const [submitting, setSubmitting] = useState(false)
 
   async function submit(draft: RequestDraft) {
-    const content = JSON.stringify(draft)
+    const content = `${draft.type}|${draft.amount_ars}`
     if (attempt.current?.content !== content) attempt.current = { content, id: crypto.randomUUID() }
     const { exchange_rate, ...queued } = draft
 
