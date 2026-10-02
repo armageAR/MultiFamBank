@@ -20,8 +20,8 @@ export function FamilyShell({ eyebrow, name, badge, actions, children }: FamilyS
         {name} · {eyebrow}
       </h1>
       <header className={`border-b border-gray-100 bg-white px-5 py-4 ${environmentLabel ? 'border-t-8 border-t-red-600' : ''}`}>
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 basis-56 items-center gap-3">
             <img src="/favicon.svg" alt="" className="size-9 shrink-0 rounded-xl" />
             <div className="min-w-0">
               <p className="truncate text-xs tracking-[0.2em] text-gray-500 uppercase">{eyebrow}</p>
@@ -34,7 +34,7 @@ export function FamilyShell({ eyebrow, name, badge, actions, children }: FamilyS
               </div>
             </div>
           </div>
-          {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+          {actions && <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>}
         </div>
       </header>
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 p-5 pb-8">{children}</main>

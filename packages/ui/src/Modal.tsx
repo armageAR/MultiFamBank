@@ -55,7 +55,7 @@ export function Modal({ title, onClose, children }: ModalProps) {
           type="button"
           onClick={requestClose}
           aria-label="Cerrar"
-          className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-brand-600"
+          className={`rounded-lg p-1 focus-visible:outline-2 ${family ? 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-emerald-500' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-brand-600'}`}
         >
           <svg viewBox="0 0 20 20" className="size-5" aria-hidden fill="currentColor">
             <path d="M5.3 5.3a1 1 0 0 1 1.4 0L10 8.6l3.3-3.3a1 1 0 1 1 1.4 1.4L11.4 10l3.3 3.3a1 1 0 0 1-1.4 1.4L10 11.4l-3.3 3.3a1 1 0 0 1-1.4-1.4L8.6 10 5.3 6.7a1 1 0 0 1 0-1.4z" />

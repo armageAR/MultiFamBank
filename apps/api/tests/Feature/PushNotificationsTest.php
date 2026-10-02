@@ -63,7 +63,7 @@ class PushNotificationsTest extends TestCase
         $sent = [];
         $push = Mockery::mock(PushNotifications::class);
         $push->shouldReceive('sendQuietly')->andReturnUsing(function (User $user, array $message) use (&$sent) {
-            $sent[] = [$user->id, $message['title'], $message['body']];
+            $sent[] = [$user->id, $message['title'], $message['body'], $message['url'] ?? null];
         });
         $this->app->instance(PushNotifications::class, $push);
 
@@ -72,8 +72,9 @@ class PushNotificationsTest extends TestCase
         Sanctum::actingAs($admin);
         $this->postJson("/api/admin/operations/$id/confirm", ['amount_ars' => '12000'])->assertOk();
 
-        $this->assertSame([$admin->id, 'Nuevo pedido', 'Sofía pide un gasto de $ 15.000: Salida'], $sent[0]);
-        $this->assertSame([$client->id, 'Pedido confirmado', 'Se confirmó un gasto de $ 12.000 (con cambios del administrador).'], $sent[1]);
+        $this->assertSame([$admin->id, 'Nuevo pedido', 'Sofía pide un gasto de $ 15.000: Salida'], array_slice($sent[0], 0, 3));
+        $this->assertSame([$client->id, 'Pedido confirmado', 'Se confirmó un gasto de $ 12.000 (con cambios del administrador).'], array_slice($sent[1], 0, 3));
+        $this->assertSame(config('multifambank.urls.client')."/?banco={$bank->id}&operacion=$id", $sent[1][3]);
     }
 
     public function test_only_known_push_services_can_be_registered(): void
