@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
-      environmentBranding(environment, 'emerald'),
+      environmentBranding(environment, 'sky'),
       VitePWA({
         registerType: 'autoUpdate',
         // Custom worker (src/sw.ts) so it can show push notifications.
