@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes } from 'react'
 import { useLook, type Look } from './look'
 
-type Variant = 'primary' | 'secondary' | 'danger' | 'ghost'
+type Variant = 'primary' | 'secondary' | 'danger' | 'warning' | 'ghost'
 
 const base: Record<Look, string> = {
   platform:
@@ -15,12 +15,14 @@ const variants: Record<Look, Record<Variant, string>> = {
     primary: 'bg-brand-700 text-white hover:bg-brand-900 disabled:bg-slate-400',
     secondary: 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:text-slate-400',
     danger: 'bg-red-700 text-white hover:bg-red-800 disabled:bg-slate-400',
+    warning: 'bg-amber-500 text-white hover:bg-amber-600 disabled:bg-slate-400',
     ghost: 'text-current underline-offset-4 hover:underline',
   },
   family: {
     primary: 'bg-emerald-600 text-white hover:bg-emerald-500',
     secondary: 'border border-gray-200 bg-white font-normal text-gray-600 hover:border-gray-300 hover:text-gray-900',
     danger: 'bg-red-600 text-white hover:bg-red-500',
+    warning: 'bg-amber-500 text-white hover:bg-amber-400',
     ghost: 'font-normal text-current underline-offset-4 hover:underline',
   },
 }

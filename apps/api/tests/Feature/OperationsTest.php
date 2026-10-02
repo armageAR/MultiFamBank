@@ -304,4 +304,14 @@ class OperationsTest extends TestCase
         cache()->forget('exchange_rates.failing');
         $this->ask(['type' => 'savings_deposit', 'amount_ars' => '1100'])->assertJsonValidationErrors('exchange_rate');
     }
+
+    public function test_the_client_records_the_quote_they_saw_only_if_it_is_still_current(): void
+    {
+        $this->ask(['type' => 'savings_deposit', 'amount_ars' => '11000', 'exchange_rate' => '1100'])
+            ->assertCreated()->assertJsonPath('data.exchange_rate', '1100.0000');
+
+        $this->ask(['type' => 'savings_withdrawal', 'amount_ars' => '1000', 'exchange_rate' => '1100'])
+            ->assertJsonValidationErrors('exchange_rate');
+        $this->assertStringContainsString('1.000,00', $this->ask(['type' => 'savings_withdrawal', 'amount_ars' => '1000', 'exchange_rate' => '900'])->json('errors.exchange_rate.0'));
+    }
 }

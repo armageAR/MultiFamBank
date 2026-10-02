@@ -59,6 +59,12 @@ class Operations
         // Fetched before the transaction: an external HTTP call must not hold row locks.
         $rate = $type === MoneyRequestType::Expense ? null : $this->quote($type);
 
+        // The client may send the quote they were shown so exactly that rate is recorded, but it is
+        // never authoritative: it must still be the current one.
+        if ($rate !== null && isset($input['exchange_rate']) && bccomp((string) $input['exchange_rate'], $rate, 4) !== 0) {
+            throw new DomainRuleException('exchange_rate', 'La cotización se actualizó: ahora es $ '.number_format((float) $rate, 2, ',', '.').'. Revisá el monto y volvé a confirmar.');
+        }
+
         try {
             return DB::transaction(fn () => $this->createRequest($membership, $client, $input, $id, $type, $description, $rate), attempts: 3);
         } catch (UniqueConstraintViolationException) {
