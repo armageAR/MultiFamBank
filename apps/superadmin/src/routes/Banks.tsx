@@ -6,7 +6,7 @@ import {
   type CreateBankResponse,
   type PlatformBank,
 } from '@multifambank/api-client'
-import { Alert, BankStatusBadge, bankStatusLabels, Button, Card } from '@multifambank/ui'
+import { Alert, BankStatusBadge, bankStatusLabels, Button, Card, formatCountdown, useCountdown } from '@multifambank/ui'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
@@ -231,6 +231,8 @@ function ViewButton({ bank, actions }: { bank: PlatformBank; actions: RowActions
 
 /** The invitation can be reissued until someone accepts it, unless the bank was deactivated. */
 function ResendButton({ bank, actions }: { bank: PlatformBank; actions: RowActions }) {
+  // At most one email every 5 minutes to the same administrator (the server enforces it too).
+  const wait = useCountdown(bank.invitation?.resend_available_at)
   if (bank.admin.accepted || bank.status === 'deactivated') return null
 
   return (
@@ -238,10 +240,11 @@ function ResendButton({ bank, actions }: { bank: PlatformBank; actions: RowActio
       variant="secondary"
       className="mt-2 px-3 py-1 text-xs"
       loading={actions.resendingId === bank.id}
-      disabled={actions.resendingId !== undefined}
+      disabled={actions.resendingId !== undefined || wait > 0}
+      title={wait > 0 ? 'Para no mandar muchos emails seguidos, se puede reenviar cada 5 minutos.' : undefined}
       onClick={() => actions.onResend(bank)}
     >
-      Reenviar invitación
+      {wait > 0 ? `Reenviar en ${formatCountdown(wait)}` : 'Reenviar invitación'}
     </Button>
   )
 }

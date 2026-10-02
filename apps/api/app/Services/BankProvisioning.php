@@ -86,6 +86,8 @@ class BankProvisioning
             }
 
             $previous = $bank->adminInvitation;
+            // The latest one, revoked or not: the pause counts from the last email sent.
+            $previous?->assertResendAllowed();
 
             $this->revokePendingAdminInvitations($bank);
 

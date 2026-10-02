@@ -51,6 +51,10 @@ class ClientManagement
                 throw new DomainRuleException('email', 'Esa persona ya es cliente del banco.');
             }
 
+            // Re-inviting the same email is a resend: same 5-minute pause since the last email, even
+            // if that invitation was revoked meanwhile.
+            $bank->invitations()->where('type', InvitationType::BankClient)->where('email', $email)
+                ->whereNull('accepted_at')->latest('id')->first()?->assertResendAllowed();
             $this->pendingClientInvitations($bank, $email)->update(['revoked_at' => now()]);
 
             $invitation = $bank->invitations()->create([

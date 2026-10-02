@@ -27,6 +27,7 @@ class PlatformBankResource extends JsonResource
                 'expires_at' => $invitation->expires_at,
                 'last_sent_at' => $invitation->last_sent_at,
                 'accepted_at' => $invitation->accepted_at,
+                'resend_available_at' => $invitation->resendAvailableAt(),
             ] : null,
             'created_at' => $this->created_at,
             'activated_at' => $this->activated_at,

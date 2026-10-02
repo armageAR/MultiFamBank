@@ -32,6 +32,7 @@ export interface PlatformBank {
     expires_at: string
     last_sent_at: string | null
     accepted_at: string | null
+    resend_available_at: string
   } | null
   created_at: string
   activated_at: string | null
@@ -169,6 +170,8 @@ export interface ClientInvitation {
   state: InvitationState
   expires_at: string
   last_sent_at: string | null
+  /** Another email to this person can be sent from this moment (5-minute pause). */
+  resend_available_at: string
 }
 
 export interface InvitationResult {

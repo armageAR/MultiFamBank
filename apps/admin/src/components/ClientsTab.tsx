@@ -8,7 +8,7 @@ import {
   type ClientInvitation,
   type InvitationResult,
 } from '@multifambank/api-client'
-import { Alert, Button, formatDate, formatDateTime, formatUsd, StatusBadge } from '@multifambank/ui'
+import { Alert, Button, formatCountdown, formatDate, formatDateTime, formatUsd, Modal, StatusBadge, useCountdown } from '@multifambank/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../api'
@@ -18,18 +18,33 @@ import { HistoryModal } from './HistoryModal'
 
 type Dialog = { kind: 'invite' } | { kind: 'edit' | 'password' | 'history' | 'operation'; client: AdminClient } | null
 
-const action = 'rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-900'
+const action =
+  'rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-900'
 
-function InvitationRow({ invitation, readOnly, onError }: { invitation: ClientInvitation; readOnly: boolean; onError: (m: string) => void }) {
+interface InvitationRowProps {
+  invitation: ClientInvitation
+  readOnly: boolean
+  onError: (message: string) => void
+  /** The new link outlives this row: resending replaces the invitation, so the list re-renders. */
+  onResent: (result: InvitationResult) => void
+}
+
+function InvitationRow({ invitation, readOnly, onError, onResent }: InvitationRowProps) {
   const refresh = useRefreshAdminData()
-  const [result, setResult] = useState<InvitationResult | null>(null)
+  const [confirmingRevoke, setConfirmingRevoke] = useState(false)
+  const [busy, setBusy] = useState(false)
+  // At most one email every 5 minutes to the same person (the server enforces it too).
+  const wait = useCountdown(invitation.resend_available_at)
 
   async function run(fn: () => Promise<unknown>) {
+    setBusy(true)
     try {
       await fn()
       await refresh()
     } catch (error) {
       onError(toApiError(error).message)
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -40,25 +55,64 @@ function InvitationRow({ invitation, readOnly, onError }: { invitation: ClientIn
           <p className="text-sm font-medium text-gray-900">{invitation.name}</p>
           <p className="truncate text-xs text-gray-500">{invitation.email}</p>
         </div>
-        <StatusBadge tone={invitation.state === 'expired' ? 'error' : 'warning'} label={invitation.state === 'expired' ? 'Vencida' : `Vence ${formatDate(invitation.expires_at)}`} />
+        <StatusBadge
+          tone={invitation.state === 'expired' ? 'error' : 'warning'}
+          label={invitation.state === 'expired' ? 'Vencida' : `Vence ${formatDate(invitation.expires_at)}`}
+        />
       </div>
       {!readOnly && (
         <div className="flex gap-2">
-          <button type="button" className={action} onClick={() => run(async () => setResult(await resendClientInvitation(api, invitation.id)))}>
-            Reenviar
+          <button
+            type="button"
+            className={`${action} disabled:cursor-not-allowed disabled:opacity-50`}
+            disabled={wait > 0 || busy}
+            title={wait > 0 ? 'Para no mandar muchos emails seguidos, se puede reenviar cada 5 minutos.' : undefined}
+            onClick={() => run(async () => onResent(await resendClientInvitation(api, invitation.id)))}
+          >
+            {wait > 0 ? `Reenviar en ${formatCountdown(wait)}` : 'Reenviar'}
           </button>
-          <button type="button" className={action} onClick={() => run(() => revokeClientInvitation(api, invitation.id))}>
+          <button type="button" className={action} disabled={busy} onClick={() => setConfirmingRevoke(true)}>
             Anular
           </button>
         </div>
       )}
-      {result && <InvitationLink result={result} />}
+      {confirmingRevoke && (
+        <Modal title="Anular invitación" onClose={() => setConfirmingRevoke(false)}>
+          <p className="text-sm text-gray-700">
+            ¿Anular la invitación de <strong>{invitation.name}</strong> ({invitation.email})? El link que recibió deja de funcionar. Podés
+            invitarla de nuevo más adelante.
+          </p>
+          <div className="flex gap-2">
+            <Button variant="secondary" className="flex-1" onClick={() => setConfirmingRevoke(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="danger"
+              className="flex-1"
+              loading={busy}
+              onClick={() => run(() => revokeClientInvitation(api, invitation.id)).then(() => setConfirmingRevoke(false))}
+            >
+              Anular invitación
+            </Button>
+          </div>
+        </Modal>
+      )}
     </li>
   )
 }
 
 /** FamBank's member card: identity, balance, last activity, and actions. */
-function ClientCard({ client, readOnly, onOpen, onError }: { client: AdminClient; readOnly: boolean; onOpen: (d: Dialog) => void; onError: (m: string) => void }) {
+function ClientCard({
+  client,
+  readOnly,
+  onOpen,
+  onError,
+}: {
+  client: AdminClient
+  readOnly: boolean
+  onOpen: (d: Dialog) => void
+  onError: (m: string) => void
+}) {
   const refresh = useRefreshAdminData()
   const active = client.status === 'active'
 
@@ -78,7 +132,9 @@ function ClientCard({ client, readOnly, onOpen, onError }: { client: AdminClient
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold text-gray-900">{client.name}</p>
             {!active && <StatusBadge tone="neutral" label="Dado de baja" />}
-            {client.pending_requests > 0 && <StatusBadge tone="warning" label={`${client.pending_requests} pendiente${client.pending_requests > 1 ? 's' : ''}`} />}
+            {client.pending_requests > 0 && (
+              <StatusBadge tone="warning" label={`${client.pending_requests} pendiente${client.pending_requests > 1 ? 's' : ''}`} />
+            )}
           </div>
           <p className="truncate text-xs text-gray-500">{client.email}</p>
         </div>
@@ -123,6 +179,7 @@ export function ClientsTab({ readOnly }: { readOnly: boolean }) {
   const clients = useQuery({ queryKey: keys.clients, queryFn: () => fetchAdminClients(api) })
   const [dialog, setDialog] = useState<Dialog>(null)
   const [error, setError] = useState<string | null>(null)
+  const [resent, setResent] = useState<InvitationResult | null>(null)
 
   return (
     <div className="flex flex-col gap-4">
@@ -144,7 +201,7 @@ export function ClientsTab({ readOnly }: { readOnly: boolean }) {
               <h2 className="text-xs tracking-wide text-gray-500 uppercase">Invitaciones pendientes</h2>
               <ul>
                 {clients.data.invitations.map((invitation) => (
-                  <InvitationRow key={invitation.id} invitation={invitation} readOnly={readOnly} onError={setError} />
+                  <InvitationRow key={invitation.id} invitation={invitation} readOnly={readOnly} onError={setError} onResent={setResent} />
                 ))}
               </ul>
             </section>
@@ -164,6 +221,15 @@ export function ClientsTab({ readOnly }: { readOnly: boolean }) {
       {!readOnly && dialog?.kind === 'edit' && <EditClientModal client={dialog.client} onClose={() => setDialog(null)} />}
       {!readOnly && dialog?.kind === 'password' && <PasswordModal client={dialog.client} onClose={() => setDialog(null)} />}
       {!readOnly && dialog?.kind === 'operation' && <NewOperationModal client={dialog.client} onClose={() => setDialog(null)} />}
+      {resent && (
+        <Modal title="Invitación reenviada" onClose={() => setResent(null)}>
+          <InvitationLink result={resent} />
+          <p className="text-xs text-gray-500">El link anterior ya no funciona.</p>
+          <Button variant="secondary" onClick={() => setResent(null)}>
+            Listo
+          </Button>
+        </Modal>
+      )}
       {dialog?.kind === 'history' && <HistoryModal client={dialog.client} readOnly={readOnly} onClose={() => setDialog(null)} />}
     </div>
   )

@@ -170,6 +170,7 @@ class ClientController extends Controller
             'state' => $invitation->state(),
             'expires_at' => $invitation->expires_at,
             'last_sent_at' => $invitation->last_sent_at,
+            'resend_available_at' => $invitation->resendAvailableAt(),
         ];
     }
 
