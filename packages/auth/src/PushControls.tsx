@@ -1,6 +1,6 @@
 import { Alert } from '@multifambank/ui'
 import type { AxiosInstance } from 'axios'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { usePushNotifications } from './push'
 
 const pill = 'rounded-lg border px-2 py-1.5 text-xs transition-colors'
@@ -13,17 +13,26 @@ export function PushControls({ api }: { api: AxiosInstance }) {
   const push = usePushNotifications(api)
   const [open, setOpen] = useState(false)
   const menu = useRef<HTMLDivElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const panelId = useId()
 
   useEffect(() => {
     if (!open) return
-    const close = (event: MouseEvent | KeyboardEvent) => {
-      if (event instanceof KeyboardEvent ? event.key === 'Escape' : !menu.current?.contains(event.target as Node)) setOpen(false)
+    const onPointer = (event: PointerEvent) => {
+      if (!menu.current?.contains(event.target as Node)) setOpen(false)
     }
-    document.addEventListener('mousedown', close)
-    document.addEventListener('keydown', close)
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      // Only this panel closes; an open dialog behind it stays open.
+      event.stopPropagation()
+      setOpen(false)
+      trigger.current?.focus()
+    }
+    document.addEventListener('pointerdown', onPointer)
+    document.addEventListener('keydown', onKey, true)
     return () => {
-      document.removeEventListener('mousedown', close)
-      document.removeEventListener('keydown', close)
+      document.removeEventListener('pointerdown', onPointer)
+      document.removeEventListener('keydown', onKey, true)
     }
   }, [open])
 
@@ -40,19 +49,19 @@ export function PushControls({ api }: { api: AxiosInstance }) {
       {push.status === 'subscribed' && (
         <div className="relative" ref={menu}>
           <button
+            ref={trigger}
             type="button"
-            aria-haspopup="menu"
             aria-expanded={open}
+            aria-controls={panelId}
             onClick={() => setOpen(!open)}
             className={`${pill} border-emerald-200 text-emerald-600`}
           >
             notif. activas ▾
           </button>
           {open && (
-            <div role="menu" className="absolute right-0 z-30 mt-1 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white text-sm shadow-lg">
+            <div id={panelId} className="absolute right-0 z-30 mt-1 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white text-sm shadow-lg">
               <button
                 type="button"
-                role="menuitem"
                 onClick={() => {
                   setOpen(false)
                   void push.test()
@@ -63,7 +72,6 @@ export function PushControls({ api }: { api: AxiosInstance }) {
               </button>
               <button
                 type="button"
-                role="menuitem"
                 onClick={() => {
                   setOpen(false)
                   void push.unsubscribe()
