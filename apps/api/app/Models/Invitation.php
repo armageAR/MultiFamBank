@@ -76,7 +76,8 @@ class Invitation extends Model
     /** @throws DomainRuleException while the previous invitation is too recent. */
     public function assertResendAllowed(): void
     {
-        if ($this->accepted_at === null && $this->revoked_at === null && $this->resendAvailableAt()->isFuture()) {
+        // Revoked invitations count too: revoking and re-inviting must not skip the pause.
+        if ($this->accepted_at === null && $this->resendAvailableAt()->isFuture()) {
             $minutes = (int) ceil(now()->diffInSeconds($this->resendAvailableAt()) / 60);
 
             throw new DomainRuleException('invitation', "Ya se envió una invitación hace muy poco. Podés reenviarla en {$minutes} ".($minutes === 1 ? 'minuto' : 'minutos').'.');

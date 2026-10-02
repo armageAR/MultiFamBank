@@ -186,4 +186,13 @@ class AdminClientsTest extends TestCase
         $this->postJson("/api/admin/clients/invitations/{$created['id']}/resend")->assertOk();
         Mail::assertSentCount(2);
     }
+
+    public function test_revoking_does_not_skip_the_resend_pause(): void
+    {
+        $id = $this->postJson('/api/admin/clients/invitations', ['email' => 'nico@example.com', 'name' => 'Nico'])->json('data.id');
+        $this->deleteJson("/api/admin/clients/invitations/$id")->assertNoContent();
+
+        $this->postJson('/api/admin/clients/invitations', ['email' => 'nico@example.com', 'name' => 'Nico'])->assertJsonValidationErrors('invitation');
+        Mail::assertSentCount(1);
+    }
 }
