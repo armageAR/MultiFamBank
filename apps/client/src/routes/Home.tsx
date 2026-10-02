@@ -1,5 +1,5 @@
 import { cancelMyOperation, fetchClientBanks, fetchMyOperations, toApiError, type ClientBank, type Operation } from '@multifambank/api-client'
-import { useAuth, useOnline } from '@multifambank/auth'
+import { PushControls, useAuth, useOnline } from '@multifambank/auth'
 import {
   Alert,
   AuthLayout,
@@ -19,7 +19,6 @@ import { useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router'
 import { api } from '../api'
 import { NewRequestModal } from '../NewRequestModal'
-import { PushControls } from '../PushControls'
 
 function OperationRow({ operation, bankId, readOnly }: { operation: Operation; bankId: number; readOnly: boolean }) {
   const queryClient = useQueryClient()
@@ -82,7 +81,7 @@ function BankView({ membership, banks, onSwitch }: { membership: ClientBank; ban
       name={user!.name}
       actions={
         <>
-          <PushControls />
+          <PushControls api={api} />
           <HeaderButton onClick={signOut}>Salir</HeaderButton>
         </>
       }

@@ -48,11 +48,11 @@ class PushNotifications
 
     /**
      * @param  array{title: string, body: string, url?: string, tag?: string}  $message
-     * @return array{sent: int, failed: int, errors: list<string>}
+     * @return array{sent: int, failed: int, expired: int, errors: list<string>}
      */
     public function send(User $user, array $message): array
     {
-        $result = ['sent' => 0, 'failed' => 0, 'errors' => []];
+        $result = ['sent' => 0, 'failed' => 0, 'expired' => 0, 'errors' => []];
         $subscriptions = $user->pushSubscriptions()->get();
 
         if ($subscriptions->isEmpty() || ! $this->configured()) {
@@ -97,6 +97,7 @@ class PushNotifications
 
             // The browser dropped the subscription: forget it.
             if ($report->isSubscriptionExpired()) {
+                $result['expired']++;
                 PushSubscription::where('endpoint_hash', hash('sha256', $report->getEndpoint()))->delete();
             }
         }

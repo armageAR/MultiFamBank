@@ -99,4 +99,16 @@ class PushNotificationsTest extends TestCase
 
         $this->assertSame(0, $user->pushSubscriptions()->count());
     }
+
+    public function test_an_expired_device_subscription_asks_the_app_to_renew_it(): void
+    {
+        config(['services.webpush.public_key' => 'PUBLIC', 'services.webpush.private_key' => 'PRIVATE']);
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $push = Mockery::mock(PushNotifications::class)->makePartial();
+        $push->shouldReceive('send')->andReturn(['sent' => 0, 'failed' => 1, 'expired' => 1, 'errors' => ['Gone']]);
+        $this->app->instance(PushNotifications::class, $push);
+
+        $this->postJson('/api/push/test')->assertStatus(410)->assertJsonPath('code', 'subscription_expired');
+    }
 }

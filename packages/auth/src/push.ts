@@ -47,7 +47,8 @@ export function usePushNotifications(api: AxiosInstance) {
     void check()
   }, [check])
 
-  const subscribe = useCallback(async () => {
+  /** Returns whether this device ended up subscribed. */
+  const subscribe = useCallback(async (): Promise<boolean> => {
     setMessage(null)
     setStatus('loading')
     try {
@@ -55,12 +56,18 @@ export function usePushNotifications(api: AxiosInstance) {
       if (!key) {
         setStatus('unavailable')
         setMessage('Las notificaciones no están configuradas en el servidor.')
-        return
+        return false
       }
-      if ((await Notification.requestPermission()) !== 'granted') return setStatus('denied')
+      if ((await Notification.requestPermission()) !== 'granted') {
+        setStatus('denied')
+        return false
+      }
 
       const reg = await registration()
-      if (!reg) return setStatus('unsupported')
+      if (!reg) {
+        setStatus('unsupported')
+        return false
+      }
       // A fresh subscription guarantees it uses the server's current key.
       const previous = await reg.pushManager.getSubscription()
       if (previous) {
@@ -71,22 +78,45 @@ export function usePushNotifications(api: AxiosInstance) {
       await savePushSubscription(api, subscription.toJSON())
       setStatus('subscribed')
       setMessage('Notificaciones activadas en este dispositivo.')
+      return true
     } catch (error) {
       setMessage(toApiError(error).message)
       await check()
+      return false
     }
   }, [api, check])
+
+  const unsubscribe = useCallback(async () => {
+    setMessage(null)
+    setStatus('loading')
+    await forgetPushSubscription(api)
+    setStatus('unsubscribed')
+    setMessage('Notificaciones desactivadas en este dispositivo.')
+  }, [api])
 
   const test = useCallback(async () => {
     setMessage(null)
     try {
       setMessage(await sendTestPush(api))
     } catch (error) {
-      setMessage(toApiError(error).message)
-    }
-  }, [api])
+      const failure = toApiError(error)
+      if (failure.status !== 410) return setMessage(failure.message)
 
-  return { status, message, subscribe, test, dismiss: () => setMessage(null) }
+      // The push service invalidated this device's subscription (reinstall, cleared data…):
+      // renew it and try once more, so nobody has to deactivate and reactivate by hand. The server
+      // already deleted the expired rows, so only the local subscription is dropped here.
+      await forgetPushSubscription()
+      if (!(await subscribe())) return
+      try {
+        setMessage(`Renovamos las notificaciones de este dispositivo. ${await sendTestPush(api)}`)
+      } catch (retryError) {
+        const retry = toApiError(retryError)
+        setMessage(retry.status === 410 ? 'No pudimos renovar las notificaciones. Probá desactivarlas y activarlas de nuevo.' : retry.message)
+      }
+    }
+  }, [api, subscribe])
+
+  return { status, message, subscribe, unsubscribe, test, dismiss: () => setMessage(null) }
 }
 
 /** Removes this device's subscription so the next person signing in does not get the previous user's notifications. */

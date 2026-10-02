@@ -1,5 +1,5 @@
 import { fetchPendingOperations, toApiError, type Operation } from '@multifambank/api-client'
-import { useAuth, useOnline } from '@multifambank/auth'
+import { PushControls, useAuth, useOnline } from '@multifambank/auth'
 import { Alert, AuthLayout, Button, FamilyShell, HeaderButton } from '@multifambank/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -8,7 +8,6 @@ import { api } from '../api'
 import { ClientsTab } from '../components/ClientsTab'
 import { DashboardTab } from '../components/DashboardTab'
 import { PendingCard } from '../components/PendingCard'
-import { PushControls } from '../components/PushControls'
 import { ReportTab } from '../components/ReportTab'
 import { ReviewModal } from '../components/ReviewModal'
 import { keys } from '../queries'
@@ -76,7 +75,7 @@ export function AdminHome() {
       badge="Admin"
       actions={
         <>
-          <PushControls />
+          <PushControls api={api} />
           <HeaderButton onClick={signOut}>Salir</HeaderButton>
         </>
       }
