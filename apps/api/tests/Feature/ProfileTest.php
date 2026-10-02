@@ -14,6 +14,7 @@ class ProfileTest extends TestCase
     public function test_a_person_changes_their_email_and_password_with_the_current_password(): void
     {
         $user = User::factory()->create(['email' => 'ana@example.com']);
+        $user->pushSubscriptions()->create(['endpoint' => 'https://fcm.googleapis.com/x', 'endpoint_hash' => hash('sha256', 'x'), 'public_key' => 'k', 'auth_token' => 'a']);
         $other = $user->createToken('other-device');
         $token = $user->createToken('this-device')->plainTextToken;
 
@@ -32,6 +33,7 @@ class ProfileTest extends TestCase
         $this->assertNull($user->email_verified_at);
         // Other devices are signed out; this one keeps working.
         $this->assertNull($user->tokens()->find($other->accessToken->id));
+        $this->assertSame(0, $user->pushSubscriptions()->count());
         $this->app['auth']->forgetGuards();
         $this->withToken($token)->getJson('/api/auth/me')->assertOk();
     }

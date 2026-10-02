@@ -1,4 +1,12 @@
-import { cancelMyOperation, fetchClientBanks, fetchExchangeRates, fetchMyOperations, toApiError, type ClientBank, type Operation } from '@multifambank/api-client'
+import {
+  cancelMyOperation,
+  fetchClientBanks,
+  fetchExchangeRates,
+  fetchMyOperations,
+  toApiError,
+  type ClientBank,
+  type Operation,
+} from '@multifambank/api-client'
 import { PushControls, useAuth, useOnline } from '@multifambank/auth'
 import {
   Alert,
@@ -24,7 +32,17 @@ import { NewRequestModal } from '../components/NewRequestModal'
 import { QuotesCard } from '../components/QuotesCard'
 import { useOutbox } from '../outbox'
 
-function OperationRow({ operation, bankId, readOnly, highlighted }: { operation: Operation; bankId: number; readOnly: boolean; highlighted: boolean }) {
+function OperationRow({
+  operation,
+  bankId,
+  readOnly,
+  highlighted,
+}: {
+  operation: Operation
+  bankId: number
+  readOnly: boolean
+  highlighted: boolean
+}) {
   const queryClient = useQueryClient()
   const [error, setError] = useState<string | null>(null)
   const { requested } = operation
@@ -47,6 +65,7 @@ function OperationRow({ operation, bankId, readOnly, highlighted }: { operation:
   return (
     <li
       ref={row}
+      aria-current={highlighted ? 'true' : undefined}
       className={`flex flex-col gap-1 border-b border-gray-100 py-3 last:border-0 ${highlighted ? '-mx-2 rounded-xl bg-emerald-50 px-2 ring-2 ring-emerald-300' : ''}`}
     >
       <div className="flex items-center justify-between gap-2">
@@ -67,7 +86,9 @@ function OperationRow({ operation, bankId, readOnly, highlighted }: { operation:
       {operation.recorded_by_admin && <p className="text-xs text-gray-500">Registrada por el administrador</p>}
       {operation.rejection_reason && <p className="text-xs text-red-600">Motivo: {operation.rejection_reason}</p>}
       <div className="flex items-center justify-between text-xs text-gray-500">
-        <span>{operation.status === 'confirmed' ? formatDateTime(operation.occurred_at) : `Pedido el ${formatDateTime(operation.created_at)}`}</span>
+        <span>
+          {operation.status === 'confirmed' ? formatDateTime(operation.occurred_at) : `Pedido el ${formatDateTime(operation.created_at)}`}
+        </span>
         {operation.status === 'pending' && !readOnly && (
           <button type="button" onClick={cancel} className="text-red-600 hover:underline">
             cancelar
@@ -80,7 +101,7 @@ function OperationRow({ operation, bankId, readOnly, highlighted }: { operation:
 }
 
 /** A request saved on this device: waiting for a connection, or refused by the server with a reason. */
-function OutboxRow({ item, onDiscard }: { item: OutboxRequest; onDiscard: (item: OutboxRequest) => void }) {
+function OutboxRow({ item, sending, onDiscard }: { item: OutboxRequest; sending: boolean; onDiscard: (item: OutboxRequest) => void }) {
   const rejected = item.state === 'rejected'
 
   return (
@@ -98,9 +119,12 @@ function OutboxRow({ item, onDiscard }: { item: OutboxRequest; onDiscard: (item:
       {rejected && <p className="text-xs text-red-600">{item.lastError}</p>}
       <div className="flex items-center justify-between text-xs text-gray-500">
         <span>Guardado el {formatDateTime(item.createdAt)} en este dispositivo</span>
-        <button type="button" onClick={() => onDiscard(item)} className="text-red-600 hover:underline">
-          descartar
-        </button>
+        {/* While it is being sent it may already have reached the server. */}
+        {!(sending && !rejected) && (
+          <button type="button" onClick={() => onDiscard(item)} className="text-red-600 hover:underline">
+            descartar
+          </button>
+        )}
       </div>
     </li>
   )
@@ -127,8 +151,15 @@ function BankView({ membership, banks, syncedAt, highlightedOperation, onSwitch 
   // Offline, requests can still be prepared (they wait in the outbox); a paused bank takes none.
   const readOnly = paused
   const outbox = useOutbox(user!.id, bankId)
-  const queued = outbox.items.filter((item) => item.state === 'queued').length
+  const queued = outbox.queuedCount
   const [notice, setNotice] = useState<string | null>(null)
+  const [confirmingExit, setConfirmingExit] = useState(false)
+
+  // Unsent requests live only on this device and are wiped on sign-out: ask first.
+  function exit() {
+    if (queued > 0) setConfirmingExit(true)
+    else void signOut()
+  }
 
   return (
     <FamilyShell
@@ -138,7 +169,7 @@ function BankView({ membership, banks, syncedAt, highlightedOperation, onSwitch 
         <>
           <PushControls api={api} />
           <HeaderButton onClick={() => setAccount(true)}>Mi cuenta</HeaderButton>
-          <HeaderButton onClick={signOut}>Salir</HeaderButton>
+          <HeaderButton onClick={exit}>Salir</HeaderButton>
         </>
       }
     >
@@ -158,19 +189,44 @@ function BankView({ membership, banks, syncedAt, highlightedOperation, onSwitch 
           </div>
         </Alert>
       )}
-      {queued > 0 && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800">
-          <span>
-            {queued} pedido{queued > 1 ? 's' : ''} esperando para enviarse.
-          </span>
-          {online && (
-            <button type="button" onClick={outbox.sync} disabled={outbox.syncing} className="font-semibold hover:underline disabled:opacity-50">
-              {outbox.syncing ? 'Enviando…' : 'Sincronizar ahora'}
-            </button>
-          )}
-        </div>
+      {confirmingExit && (
+        <Alert tone="warning" title={`Tenés ${queued} pedido${queued > 1 ? 's' : ''} sin enviar`}>
+          <p>Si salís ahora se borran de este dispositivo y no se envían.</p>
+          <div className="mt-2 flex gap-2">
+            <Button variant="secondary" className="flex-1 py-2" onClick={() => setConfirmingExit(false)}>
+              Quedarme
+            </Button>
+            <Button variant="danger" className="flex-1 py-2" onClick={() => void signOut()}>
+              Salir igual
+            </Button>
+          </div>
+        </Alert>
       )}
-      {paused && <Alert tone="warning" title="Las operaciones del banco están pausadas">Comunicate con el administrador de tu banco.</Alert>}
+      <div role="status" aria-live="polite">
+        {queued > 0 && (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800">
+            <span>
+              {queued} pedido{queued > 1 ? 's' : ''} esperando para enviarse.
+              {outbox.lastFailed && ' El último intento falló; se reintenta solo.'}
+            </span>
+            {online && (
+              <button
+                type="button"
+                onClick={outbox.sync}
+                disabled={outbox.syncing}
+                className="font-semibold hover:underline disabled:opacity-50"
+              >
+                {outbox.syncing ? 'Enviando…' : 'Sincronizar ahora'}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      {paused && (
+        <Alert tone="warning" title="Las operaciones del banco están pausadas">
+          Comunicate con el administrador de tu banco.
+        </Alert>
+      )}
       {banks.length > 1 && (
         <nav className="flex gap-1 overflow-x-auto rounded-xl border border-gray-100 bg-white p-1 shadow-sm" aria-label="Tus bancos">
           {banks.map((b) => {
@@ -225,7 +281,7 @@ function BankView({ membership, banks, syncedAt, highlightedOperation, onSwitch 
         ) : (
           <ul>
             {outbox.items.map((item) => (
-              <OutboxRow key={item.id} item={item} onDiscard={outbox.discard} />
+              <OutboxRow key={item.id} item={item} sending={outbox.syncing} onDiscard={outbox.discard} />
             ))}
             {operations.data.data.map((operation) => (
               <OperationRow

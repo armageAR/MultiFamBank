@@ -45,6 +45,11 @@ export function openBankDatabase(userId: string | number, bankId: string | numbe
   const db = new Dexie(name) as BankDatabase
   db.version(1).stores({ snapshots: 'key', outbox: 'id, createdAt' })
   db.version(2).stores({ snapshots: 'key', outbox: 'id, createdAt, state' })
+  // Deleted or closed elsewhere (sign-out, another tab): the next call opens a fresh instance.
+  db.on('close', () => open.delete(name))
+  db.on('versionchange', () => {
+    open.delete(name)
+  })
   open.set(name, db)
   return db
 }

@@ -27,7 +27,7 @@ export function AccountModal({ user, onClose }: { user: User; onClose: () => voi
         ...(password ? { password, password_confirmation: confirmation } : {}),
       })
       await refresh()
-      setDone(password ? 'Datos actualizados. Las sesiones en otros dispositivos se cerraron.' : 'Email actualizado.')
+      setDone('Datos actualizados. Se cerraron las sesiones en otros dispositivos; los pedidos que tuvieran sin enviar se pierden.')
       setPassword('')
       setConfirmation('')
       setCurrent('')
@@ -55,7 +55,10 @@ export function AccountModal({ user, onClose }: { user: User; onClose: () => voi
           autoCapitalize="none"
           autoComplete="email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setDone(null)
+            setEmail(e.target.value)
+          }}
           error={error?.fields.email}
         />
         <TextField

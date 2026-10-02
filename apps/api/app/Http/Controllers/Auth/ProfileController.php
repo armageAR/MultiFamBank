@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * A person changes their own email or password, confirming with the current password (as in
@@ -48,8 +49,11 @@ class ProfileController extends Controller
                 $user->save();
 
                 if ($emailChanged || isset($data['password'])) {
-                    // Other sessions sign out; this one stays.
-                    $user->tokens()->whereKeyNot($request->user()->currentAccessToken()->id)->delete();
+                    // Other sessions sign out; this one stays. Notifications stop on every device;
+                    // this device re-registers its subscription the next time the app opens.
+                    $current = $request->user()->currentAccessToken();
+                    $user->tokens()->when($current instanceof PersonalAccessToken, fn ($q) => $q->whereKeyNot($current->id))->delete();
+                    $user->pushSubscriptions()->delete();
                 }
 
                 AuditLog::record('profile.updated', $user, null, $before, [
