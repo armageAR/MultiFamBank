@@ -29,6 +29,20 @@ export default defineRailway((ctx) => {
   const repo = github("armageAR/MultiFamBank", { branch, checkSuites: true });
   // The public FamBank page answers on its own domain in production (custom domain set in Railway).
   const landingOrigins = environment === "production" ? ",https://fambank.armage.tech" : "";
+  // Production sends real email through Resend's SMTP; host, credentials and sender live only in
+  // Railway. Staging logs emails and shows invitation links to the superadmin instead.
+  const mail =
+    environment === "production"
+      ? {
+          MAIL_MAILER: preserve(),
+          MAIL_HOST: preserve(),
+          MAIL_PORT: preserve(),
+          MAIL_USERNAME: preserve(),
+          MAIL_PASSWORD: preserve(),
+          MAIL_ENCRYPTION: preserve(),
+          MAIL_FROM_ADDRESS: preserve(),
+        }
+      : { MAIL_MAILER: "log", MAIL_FROM_ADDRESS: "onboarding@resend.dev" };
 
   const Postgres = postgres("Postgres", { region });
   Postgres.networking = { privateNetworkEndpoint: "postgres" };
@@ -64,20 +78,16 @@ export default defineRailway((ctx) => {
       CLIENT_APP_URL: "https://${{client.RAILWAY_PUBLIC_DOMAIN}}",
       ADMIN_APP_URL: "https://${{admin.RAILWAY_PUBLIC_DOMAIN}}",
       SUPERADMIN_APP_URL: "https://${{superadmin.RAILWAY_PUBLIC_DOMAIN}}",
-      // "log" until Resend is set up: emails go to the logs and the superadmin sees invitation links.
-      // To deliver real emails: MAIL_MAILER "resend", add RESEND_API_KEY: preserve(), and set its value
-      // with `railway variable set RESEND_API_KEY=... --service api`.
       // Web Push keys, one pair per environment (php artisan push:vapid-keys); values live only in Railway.
       VAPID_PUBLIC_KEY: preserve(),
       VAPID_PRIVATE_KEY: preserve(),
       VAPID_SUBJECT: preserve(),
-      MAIL_MAILER: "log",
-      // Access requests from the public page: the recipient lives only in Railway. ACCESS_REQUEST_MAILER
-      // (set in Railway, e.g. "resend" with RESEND_API_KEY) sends them while MAIL_MAILER stays "log".
+      ...mail,
+      MAIL_FROM_NAME: "MultiFamBank",
+      // Access requests from the public page: recipient and mailer live only in Railway
+      // ("smtp" in production, "log" in staging).
       ACCESS_REQUEST_NOTIFY_EMAIL: preserve(),
       ACCESS_REQUEST_MAILER: preserve(),
-      MAIL_FROM_ADDRESS: "onboarding@resend.dev",
-      MAIL_FROM_NAME: "MultiFamBank",
       CORS_ALLOWED_ORIGINS:
         "https://${{client.RAILWAY_PUBLIC_DOMAIN}},https://${{admin.RAILWAY_PUBLIC_DOMAIN}},https://${{superadmin.RAILWAY_PUBLIC_DOMAIN}},https://${{landing.RAILWAY_PUBLIC_DOMAIN}}" +
         landingOrigins,
