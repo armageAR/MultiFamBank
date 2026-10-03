@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router'
 import { api, tokenStore } from './api'
 import './index.css'
+import { AccessRequests } from './routes/AccessRequests'
 import { Banks } from './routes/Banks'
 import { NewBank } from './routes/NewBank'
 import { PlatformLayout } from './routes/PlatformLayout'
@@ -22,6 +23,7 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: <Banks /> },
       { path: '/bancos/nuevo', element: <NewBank /> },
+      { path: '/solicitudes', element: <AccessRequests /> },
     ],
   },
 ])

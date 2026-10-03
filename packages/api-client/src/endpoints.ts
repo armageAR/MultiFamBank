@@ -1,5 +1,7 @@
 import type { AxiosInstance } from 'axios'
 import type {
+  AccessRequest,
+  AccessRequestList,
   AdminBank,
   AdminClient,
   AdminDashboard,
@@ -69,6 +71,19 @@ export interface BankListParams {
   status?: BankStatus
   search?: string
   page?: number
+}
+
+export async function listAccessRequests(
+  client: AxiosInstance,
+  params: { status?: 'pending' | 'contacted'; search?: string; page?: number } = {},
+): Promise<AccessRequestList> {
+  const { data } = await client.get<AccessRequestList>('/platform/access-requests', { params })
+  return data
+}
+
+export async function markAccessRequestContacted(client: AxiosInstance, id: number, contacted: boolean): Promise<AccessRequest> {
+  const { data } = await client.patch<{ data: AccessRequest }>(`/platform/access-requests/${id}`, { contacted })
+  return data.data
 }
 
 export async function listPlatformBanks(client: AxiosInstance, params: BankListParams = {}): Promise<PlatformBankList> {
