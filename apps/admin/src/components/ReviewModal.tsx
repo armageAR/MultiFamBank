@@ -98,13 +98,13 @@ export function ReviewModal({ operation, onClose }: { operation: Operation; onCl
             <Button variant="secondary" className="flex-1" loading={busy === 'save'} onClick={() => run('save')}>
               Guardar
             </Button>
+            <Button variant="danger" className="flex-1" onClick={() => setRejecting(true)}>
+              Rechazar
+            </Button>
             <Button className="flex-1" loading={busy === 'confirm'} onClick={() => run('confirm')}>
               Confirmar
             </Button>
           </div>
-          <button type="button" onClick={() => setRejecting(true)} className="text-center text-xs text-red-600 hover:underline">
-            Rechazar pedido
-          </button>
         </>
       )}
     </Modal>
