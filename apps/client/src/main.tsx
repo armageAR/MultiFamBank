@@ -8,7 +8,6 @@ import { createBrowserRouter, RouterProvider } from 'react-router'
 import { api, tokenStore } from './api'
 import './index.css'
 import { Home } from './routes/Home'
-import { Links } from './routes/Links'
 
 const { queryClient, persister, clearStorage, maxAge, buster, dehydrateOptions } = createOfflineQueryClient('mfb.client.cache')
 
@@ -21,7 +20,6 @@ const endSession = () => {
 
 const router = createBrowserRouter([
   { path: '/', element: <Home /> },
-  { path: '/links', element: <Links /> },
   { path: '/ingresar', element: <LoginPage appName="Mi banco" api={api} /> },
   { path: '/olvide-contrasena', element: <ForgotPasswordPage appName="Mi banco" api={api} /> },
   { path: '/restablecer-contrasena', element: <ResetPasswordPage appName="Mi banco" api={api} /> },
