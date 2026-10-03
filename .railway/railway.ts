@@ -75,6 +75,7 @@ export default defineRailway((ctx) => {
       // Access requests from the public page: the recipient lives only in Railway. ACCESS_REQUEST_MAILER
       // (set in Railway, e.g. "resend" with RESEND_API_KEY) sends them while MAIL_MAILER stays "log".
       ACCESS_REQUEST_NOTIFY_EMAIL: preserve(),
+      ACCESS_REQUEST_MAILER: preserve(),
       MAIL_FROM_ADDRESS: "onboarding@resend.dev",
       MAIL_FROM_NAME: "MultiFamBank",
       CORS_ALLOWED_ORIGINS:

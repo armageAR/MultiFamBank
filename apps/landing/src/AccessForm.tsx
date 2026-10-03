@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 
 const apiUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/$/, '')
 
@@ -12,13 +12,27 @@ export function AccessForm() {
   const [errors, setErrors] = useState<Errors>({})
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState<{ name: string; email: string } | null>(null)
+  const nameInput = useRef<HTMLInputElement>(null)
+  const emailInput = useRef<HTMLInputElement>(null)
+  const thanks = useRef<HTMLHeadingElement>(null)
+
+  // Screen readers hear the outcome: focus moves to the thanks, or to the first field to fix.
+  useEffect(() => {
+    if (sent) thanks.current?.focus()
+  }, [sent])
+
+  function showErrors(next: Errors) {
+    setErrors(next)
+    if (next.name) nameInput.current?.focus()
+    else if (next.email) emailInput.current?.focus()
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     const local: Errors = {}
     if (!name.trim()) local.name = 'Contanos tu nombre.'
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) local.email = 'Ese email no parece válido.'
-    setErrors(local)
+    showErrors(local)
     if (Object.keys(local).length) return
 
     setSending(true)
@@ -33,7 +47,7 @@ export function AccessForm() {
         setSent(body.data)
       } else if (response.status === 422) {
         const fields = (body.errors ?? {}) as Record<string, string[]>
-        setErrors({ name: fields.name?.[0], email: fields.email?.[0], form: fields.website?.[0] })
+        showErrors({ name: fields.name?.[0], email: fields.email?.[0], form: fields.website?.[0] })
       } else if (response.status === 429) {
         setErrors({ form: 'Recibimos muchos intentos seguidos. Probá de nuevo en un rato.' })
       } else {
@@ -52,7 +66,9 @@ export function AccessForm() {
         <p className="text-5xl" aria-hidden="true">
           🎉
         </p>
-        <h3 className="mt-3 text-2xl font-extrabold text-gray-900">¡Gracias, {sent.name}!</h3>
+        <h3 ref={thanks} tabIndex={-1} className="mt-3 text-2xl font-extrabold text-gray-900 outline-none">
+          ¡Gracias, {sent.name}!
+        </h3>
         <p className="mt-2 text-gray-600">
           Recibimos tu solicitud. Te vamos a contactar a <strong className="text-gray-900">{sent.email}</strong> para darte acceso.
         </p>
@@ -70,7 +86,9 @@ export function AccessForm() {
           Nombre
         </label>
         <input
+          ref={nameInput}
           id="name"
+          aria-required="true"
           autoComplete="name"
           maxLength={120}
           value={name}
@@ -91,7 +109,9 @@ export function AccessForm() {
           Email
         </label>
         <input
+          ref={emailInput}
           id="email"
+          aria-required="true"
           type="email"
           inputMode="email"
           autoComplete="email"
@@ -112,8 +132,8 @@ export function AccessForm() {
       </div>
       {/* Honeypot: invisible to people, bots fill it in. */}
       <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
-        <label htmlFor="website">No completes este campo</label>
-        <input id="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
+        <label htmlFor="fb-hp">No completes este campo</label>
+        <input id="fb-hp" tabIndex={-1} autoComplete="new-password" value={website} onChange={(e) => setWebsite(e.target.value)} />
       </div>
       {errors.form && (
         <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">

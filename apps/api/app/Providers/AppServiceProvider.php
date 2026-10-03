@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Mail\Markdown;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -32,8 +33,11 @@ class AppServiceProvider extends ServiceProvider
             ]);
         });
 
+        // Names and other user input in Markdown emails stay text, never links or formatting.
+        Markdown::withSecuredEncoding();
+
         RateLimiter::for('access-requests', function (Request $request) {
-            return [Limit::perMinute(3)->by($request->ip()), Limit::perDay(20)->by($request->ip())];
+            return [Limit::perMinute(5)->by($request->ip()), Limit::perDay(20)->by($request->ip())];
         });
 
         RateLimiter::for('auth', function (Request $request) {

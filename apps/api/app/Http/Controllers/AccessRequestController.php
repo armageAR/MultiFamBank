@@ -53,8 +53,14 @@ class AccessRequestController extends Controller
         $recipient = config('multifambank.access_requests.notify_to');
         if ($recipient) {
             try {
-                Mail::mailer(config('multifambank.access_requests.mailer'))->to($recipient)->send(new AccessRequestReceivedMail($accessRequest));
-                $accessRequest->forceFill(['notified_at' => now()])->save();
+                $mailer = (string) config('multifambank.access_requests.mailer');
+                Mail::mailer($mailer)->to($recipient)->send(new AccessRequestReceivedMail($accessRequest));
+                // The log and array mailers deliver nothing: those requests stay marked as not notified.
+                if (in_array(config("mail.mailers.$mailer.transport"), ['log', 'array'], true)) {
+                    Log::warning('Access request stored but not emailed: the mailer does not deliver', ['access_request_id' => $accessRequest->id, 'mailer' => $mailer]);
+                } else {
+                    $accessRequest->forceFill(['notified_at' => now()])->save();
+                }
             } catch (Throwable $e) {
                 Log::error('Access request notification failed', ['access_request_id' => $accessRequest->id, 'error' => $e->getMessage()]);
             }

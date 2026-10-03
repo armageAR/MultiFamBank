@@ -16,7 +16,7 @@ class AccessRequestTest extends TestCase
     {
         parent::setUp();
         Mail::fake();
-        config(['multifambank.access_requests.notify_to' => 'owner@example.com']);
+        config(['multifambank.access_requests.notify_to' => 'owner@example.com', 'multifambank.access_requests.mailer' => 'resend']);
     }
 
     public function test_a_request_is_stored_and_notifies_the_configured_recipient(): void
@@ -47,6 +47,24 @@ class AccessRequestTest extends TestCase
 
         $this->assertSame(0, AccessRequest::count());
         Mail::assertNothingSent();
+    }
+
+    public function test_a_mailer_that_delivers_nothing_leaves_the_request_unnotified(): void
+    {
+        config(['multifambank.access_requests.mailer' => 'log']);
+
+        $this->postJson('/api/access-requests', ['name' => 'Laura', 'email' => 'laura@example.com'])->assertCreated();
+
+        $this->assertNull(AccessRequest::sole()->notified_at);
+    }
+
+    public function test_the_name_cannot_inject_links_into_the_email(): void
+    {
+        $request = AccessRequest::create(['name' => '[Verificá tu cuenta](https://evil.example)', 'email' => 'x@example.com']);
+
+        $html = (new AccessRequestReceivedMail($request))->render();
+
+        $this->assertStringNotContainsString('href="https://evil.example"', $html);
     }
 
     public function test_without_a_recipient_the_request_is_kept_but_nobody_is_emailed(): void
