@@ -3,7 +3,7 @@ import { defineRailway, github, postgres, preserve, project, service, volume } f
 const region = "us-east4-eqdc4a";
 
 // Frontends build from the repo root so they can resolve the pnpm workspace packages.
-function frontend(name: "client" | "admin" | "superadmin", repo: ReturnType<typeof github>, environment: "production" | "staging") {
+function frontend(name: "client" | "admin" | "superadmin" | "landing", repo: ReturnType<typeof github>, environment: "production" | "staging") {
   return service(name, {
     source: repo,
     replicas: { [region]: 1 },
@@ -27,6 +27,8 @@ export default defineRailway((ctx) => {
   const environment = ctx.isEnvironment("production") ? "production" : "staging";
   const branch = environment === "production" ? "production" : "main";
   const repo = github("armageAR/MultiFamBank", { branch, checkSuites: true });
+  // The public FamBank page answers on its own domain in production (custom domain set in Railway).
+  const landingOrigins = environment === "production" ? ",https://fambank.armage.tech" : "";
 
   const Postgres = postgres("Postgres", { region });
   Postgres.networking = { privateNetworkEndpoint: "postgres" };
@@ -70,14 +72,18 @@ export default defineRailway((ctx) => {
       VAPID_PRIVATE_KEY: preserve(),
       VAPID_SUBJECT: preserve(),
       MAIL_MAILER: "log",
+      // Access requests from the public page: the recipient lives only in Railway. ACCESS_REQUEST_MAILER
+      // (set in Railway, e.g. "resend" with RESEND_API_KEY) sends them while MAIL_MAILER stays "log".
+      ACCESS_REQUEST_NOTIFY_EMAIL: preserve(),
       MAIL_FROM_ADDRESS: "onboarding@resend.dev",
       MAIL_FROM_NAME: "MultiFamBank",
       CORS_ALLOWED_ORIGINS:
-        "https://${{client.RAILWAY_PUBLIC_DOMAIN}},https://${{admin.RAILWAY_PUBLIC_DOMAIN}},https://${{superadmin.RAILWAY_PUBLIC_DOMAIN}}",
+        "https://${{client.RAILWAY_PUBLIC_DOMAIN}},https://${{admin.RAILWAY_PUBLIC_DOMAIN}},https://${{superadmin.RAILWAY_PUBLIC_DOMAIN}},https://${{landing.RAILWAY_PUBLIC_DOMAIN}}" +
+        landingOrigins,
     },
   });
 
-  const services = [api, Postgres, frontend("client", repo, environment), frontend("admin", repo, environment), frontend("superadmin", repo, environment)];
+  const services = [api, Postgres, frontend("client", repo, environment), frontend("admin", repo, environment), frontend("superadmin", repo, environment), frontend("landing", repo, environment)];
 
   // Staging sleeps when idle (Railway Serverless) and wakes on the first request.
   if (!ctx.isEnvironment("production")) {
