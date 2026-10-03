@@ -1,5 +1,5 @@
 import { AppShell, AuthLayout, Button } from '@multifambank/ui'
-import { Navigate, Outlet } from 'react-router'
+import { NavLink, Navigate, Outlet } from 'react-router'
 import { useAuth } from '@multifambank/auth'
 
 /** Signed-in area: only the platform superadmin gets past this layout. */
@@ -26,7 +26,7 @@ export function PlatformLayout() {
   return (
     <AppShell
       title="Plataforma"
-      subtitle="Bancos y sus administradores"
+      subtitle="Bancos, administradores y solicitudes de acceso"
       actions={
         <>
           <span className="text-brand-100">{user.email}</span>
@@ -36,6 +36,23 @@ export function PlatformLayout() {
         </>
       }
     >
+      <nav className="mb-6 flex gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm" aria-label="Secciones">
+        {[
+          { to: '/', label: 'Bancos', end: true },
+          { to: '/solicitudes', label: 'Solicitudes de acceso', end: false },
+        ].map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) =>
+              `flex-1 rounded-lg px-3 py-2 text-center text-sm font-medium transition-colors ${isActive ? 'bg-brand-700 text-white' : 'text-slate-600 hover:text-slate-900'}`
+            }
+          >
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
       <Outlet />
     </AppShell>
   )

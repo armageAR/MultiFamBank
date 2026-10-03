@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Mail\AccessRequestReceivedMail;
 use App\Models\AccessRequest;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class AccessRequestTest extends TestCase
@@ -75,5 +77,27 @@ class AccessRequestTest extends TestCase
 
         $this->assertNull(AccessRequest::sole()->notified_at);
         Mail::assertNothingSent();
+    }
+
+    public function test_the_superadmin_lists_requests_and_marks_them_contacted(): void
+    {
+        $laura = AccessRequest::create(['name' => 'Laura Pérez', 'email' => 'laura@example.com']);
+        AccessRequest::create(['name' => 'Tomás', 'email' => 'tomas@example.com']);
+
+        Sanctum::actingAs(User::factory()->create());
+        $this->getJson('/api/platform/access-requests')->assertForbidden();
+
+        Sanctum::actingAs(User::factory()->superadmin()->create());
+        $list = $this->getJson('/api/platform/access-requests')->assertOk()->json();
+        $this->assertSame(['Tomás', 'Laura Pérez'], array_column($list['data'], 'name'));
+        $this->assertSame(['pending' => 2, 'contacted' => 0], $list['counts']);
+        $this->assertSame(['laura@example.com'], array_column($this->getJson('/api/platform/access-requests?search=PÉREZ')->json('data'), 'email'));
+
+        $this->patchJson("/api/platform/access-requests/{$laura->id}", ['contacted' => true])->assertOk()->assertJsonPath('data.contacted_at', fn ($v) => $v !== null);
+        $this->assertSame(['Laura Pérez'], array_column($this->getJson('/api/platform/access-requests?status=contacted')->json('data'), 'name'));
+        $this->assertSame(['Tomás'], array_column($this->getJson('/api/platform/access-requests?status=pending')->json('data'), 'name'));
+
+        $this->patchJson("/api/platform/access-requests/{$laura->id}", ['contacted' => false])->assertOk()->assertJsonPath('data.contacted_at', null);
+        $this->assertSame(2, $this->getJson('/api/platform/access-requests')->json('counts.pending'));
     }
 }

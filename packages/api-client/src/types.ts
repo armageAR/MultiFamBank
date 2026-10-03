@@ -120,6 +120,24 @@ export interface Operation {
   client: { membership_id: number; name: string } | null
 }
 
+/** Someone who asked for access from the public page. */
+export interface AccessRequest {
+  id: number
+  name: string
+  email: string
+  created_at: string
+  /** When the notification email was sent; null if it was not. */
+  notified_at: string | null
+  /** When the superadmin marked them as contacted; null while waiting. */
+  contacted_at: string | null
+}
+
+export interface AccessRequestList {
+  data: AccessRequest[]
+  meta: { current_page: number; last_page: number; per_page: number; total: number }
+  counts: { pending: number; contacted: number }
+}
+
 export interface Paginated<T> {
   data: T[]
   meta: { current_page: number; last_page: number; per_page: number; total: number }

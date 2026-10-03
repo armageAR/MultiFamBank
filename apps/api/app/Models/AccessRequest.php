@@ -11,7 +11,7 @@ class AccessRequest extends Model
 
     protected function casts(): array
     {
-        return ['notified_at' => 'datetime'];
+        return ['notified_at' => 'datetime', 'contacted_at' => 'datetime'];
     }
 
     protected function email(): Attribute

@@ -13,6 +13,7 @@ use App\Http\Controllers\Client\OperationController as ClientOperationController
 use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\InvitationController;
+use App\Http\Controllers\Platform\AccessRequestController as PlatformAccessRequestController;
 use App\Http\Controllers\Platform\BankController as PlatformBankController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Middleware\EnsureBankAdmin;
@@ -61,6 +62,8 @@ Route::prefix('platform')->middleware(['auth:sanctum', EnsureSuperadmin::class])
     Route::post('/banks/{bank}/status', [PlatformBankController::class, 'changeStatus']);
     Route::put('/banks/{bank}/admin/password', [PlatformBankController::class, 'setAdminPassword']);
     Route::post('/banks/{bank}/admin-invitation', [PlatformBankController::class, 'resendInvitation']);
+    Route::get('/access-requests', [PlatformAccessRequestController::class, 'index']);
+    Route::patch('/access-requests/{accessRequest}', [PlatformAccessRequestController::class, 'update']);
 });
 
 Route::prefix('admin')->middleware(['auth:sanctum', EnsureBankAdmin::class])->group(function () {
