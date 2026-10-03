@@ -272,6 +272,10 @@ Frontends read the API base URL from `VITE_API_URL` (default `http://localhost:8
 
 Other root scripts: `pnpm build`, `pnpm typecheck`, `pnpm lint`. API tests: `cd apps/api && php artisan test`.
 
+## Demo videos
+
+`videos/` is a separate Remotion workspace for demo videos. It is not deployed and not part of the pnpm workspace; see `videos/README.md`.
+
 ## Deployment
 
 Everything runs in one Railway project, defined in `.railway/railway.ts`:
