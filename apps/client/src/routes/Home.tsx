@@ -7,7 +7,7 @@ import {
   type ClientBank,
   type Operation,
 } from '@multifambank/api-client'
-import { PushControls, useAuth, useOnline } from '@multifambank/auth'
+import { AccountModal, PushControls, useAuth, useOnline } from '@multifambank/auth'
 import {
   Alert,
   AuthLayout,
@@ -27,7 +27,6 @@ import { useEffect, useRef, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router'
 import type { OutboxRequest } from '@multifambank/offline'
 import { api } from '../api'
-import { AccountModal } from '../components/AccountModal'
 import { ExpenseModal } from '../components/requests/ExpenseModal'
 import { SavingsModal } from '../components/requests/SavingsModal'
 import { QuotesCard } from '../components/QuotesCard'
@@ -337,7 +336,15 @@ function BankView({ membership, banks, syncedAt, highlightedOperation, onSwitch 
           onQueued={queuedNotice}
         />
       )}
-      {account && user && <AccountModal user={user} onClose={() => setAccount(false)} />}
+      {account && user && (
+        <AccountModal
+          api={api}
+          user={user}
+          nameNote="El nombre lo administra el administrador de tu banco."
+          savedMessage="Datos actualizados. Se cerraron las sesiones en otros dispositivos; los pedidos que tuvieran sin enviar se pierden."
+          onClose={() => setAccount(false)}
+        />
+      )}
     </FamilyShell>
   )
 }

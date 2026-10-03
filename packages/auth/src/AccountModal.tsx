@@ -1,11 +1,22 @@
 import { toApiError, updateProfile, type ApiError, type User } from '@multifambank/api-client'
-import { useAuth } from '@multifambank/auth'
 import { Alert, Button, Modal, TextField } from '@multifambank/ui'
+import type { AxiosInstance } from 'axios'
 import { useState, type FormEvent } from 'react'
-import { api } from '../api'
+import { useAuth } from './session'
 
-/** FamBank's "Mi cuenta": email and password; the name is managed by the bank administrator. */
-export function AccountModal({ user, onClose }: { user: User; onClose: () => void }) {
+interface AccountModalProps {
+  api: AxiosInstance
+  user: User
+  title?: string
+  /** Who manages the name, since it cannot be changed here. */
+  nameNote: string
+  /** Shown after saving: what changing the email or password did. */
+  savedMessage: string
+  onClose: () => void
+}
+
+/** FamBank's "Mi cuenta": email and password, confirmed with the current password. */
+export function AccountModal({ api, user, title = 'Mi cuenta', nameNote, savedMessage, onClose }: AccountModalProps) {
   const { refresh } = useAuth()
   const [email, setEmail] = useState(user.email)
   const [password, setPassword] = useState('')
@@ -27,7 +38,7 @@ export function AccountModal({ user, onClose }: { user: User; onClose: () => voi
         ...(password ? { password, password_confirmation: confirmation } : {}),
       })
       await refresh()
-      setDone('Datos actualizados. Se cerraron las sesiones en otros dispositivos; los pedidos que tuvieran sin enviar se pierden.')
+      setDone(savedMessage)
       setPassword('')
       setConfirmation('')
       setCurrent('')
@@ -39,12 +50,12 @@ export function AccountModal({ user, onClose }: { user: User; onClose: () => voi
   }
 
   return (
-    <Modal title="Mi cuenta" onClose={onClose}>
+    <Modal title={title} onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3" noValidate>
         <div>
           <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">Nombre</p>
           <p className="mt-1 text-sm text-gray-900">{user.name}</p>
-          <p className="text-xs text-gray-500">El nombre lo administra el administrador de tu banco.</p>
+          <p className="text-xs text-gray-500">{nameNote}</p>
         </div>
         {done && <Alert tone="success">{done}</Alert>}
         {error && !error.fields.email && !error.fields.password && !error.fields.current_password && <Alert tone="error">{error.message}</Alert>}
