@@ -89,7 +89,7 @@ export function ReportTab() {
             )}
           </Card>
           <Card title="Movimientos de ahorros (no son gastos)">
-            <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 min-[410px]:grid-cols-2">
               <div className="rounded-xl bg-emerald-50 px-4 py-3 text-right">
                 <p className="text-xs text-emerald-700">Depósitos</p>
                 <p className="text-base font-bold text-emerald-700">{formatArs(report.data.savings.deposits_ars)}</p>

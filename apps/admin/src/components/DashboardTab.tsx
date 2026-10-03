@@ -49,7 +49,7 @@ export function DashboardTab() {
   return (
     <div className="flex flex-col gap-4">
       <Card title="Ahorros de los clientes">
-        <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 min-[410px]:grid-cols-2">
           <div className="rounded-xl bg-emerald-50 px-4 py-3 text-right">
             <p className="mb-1 text-xs text-emerald-700">Dólares</p>
             <p className="text-lg font-bold whitespace-nowrap text-emerald-700">{formatUsd(data.balance_usd)}</p>
@@ -68,7 +68,7 @@ export function DashboardTab() {
         )}
       </Card>
 
-      <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 min-[410px]:grid-cols-2">
         <Card title="Gastos del banco">
           <p className="text-right text-xl font-bold whitespace-nowrap text-gray-900">{formatArs(data.month_expenses_ars)}</p>
           <p className="mt-1 text-right text-xs text-gray-500">{monthName(data.month)}</p>
@@ -90,14 +90,14 @@ export function DashboardTab() {
                 </button>
               </div>
               {refreshError && <p className="mb-2 text-xs text-red-600">{refreshError}</p>}
-              <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 min-[410px]:grid-cols-2">
                 <Quote label="Compra" value={rates.blue.buy} />
                 <Quote label="Venta" value={rates.blue.sell} />
               </div>
             </div>
             <div>
               <p className="mb-2 text-xs text-gray-500">Dólar oficial</p>
-              <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 min-[410px]:grid-cols-2">
                 <Quote label="Compra" value={rates.oficial.buy} />
                 <Quote label="Venta" value={rates.oficial.sell} />
               </div>

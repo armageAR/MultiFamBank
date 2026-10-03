@@ -12,7 +12,7 @@ export function QuotesCard({ rates }: { rates: UseQueryResult<ExchangeRates> }) 
         <p className="text-xs text-red-600">No se pudo obtener la cotización. {toApiError(rates.error).message}</p>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 min-[410px]:grid-cols-2">
             <div className="rounded-xl bg-gray-50 px-4 py-3">
               <p className="text-right text-xs text-gray-500">Compra</p>
               <p className="text-right text-xl font-bold whitespace-nowrap text-gray-900">{formatArs(rates.data.blue.buy)}</p>

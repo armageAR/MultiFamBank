@@ -255,7 +255,7 @@ function BankView({ membership, banks, syncedAt, highlightedOperation, onSwitch 
       )}
 
       <Card title="Mis ahorros">
-        <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 min-[410px]:grid-cols-2">
           <div className="rounded-xl bg-emerald-50 px-4 py-3 text-right">
             <p className="mb-1 text-xs text-emerald-700">Dólares</p>
             <p className="text-lg font-bold whitespace-nowrap text-emerald-700">{formatUsd(membership.balance_usd)}</p>

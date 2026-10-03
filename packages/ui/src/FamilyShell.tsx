@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { EnvironmentBadge } from './EnvironmentBadge'
 import { environmentLabel } from './environment'
+import { InstallPrompt } from './InstallPrompt'
 
 interface FamilyShellProps {
   /** Small uppercase line above the name, e.g. the bank's name. */
@@ -37,7 +38,10 @@ export function FamilyShell({ eyebrow, name, badge, actions, children }: FamilyS
           {actions && <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>}
         </div>
       </header>
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 p-5 pb-8">{children}</main>
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 p-5 pb-8">
+        <InstallPrompt />
+        {children}
+      </main>
     </div>
   )
 }
