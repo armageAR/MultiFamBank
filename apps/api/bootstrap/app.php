@@ -15,6 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Railway's edge proxy is the only way in: trust it so request IPs (rate limits) are the visitor's.
+        $middleware->trustProxies(at: '*', headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_PROTO);
         // Runs after authentication, so only requests with a valid session count as activity.
         $middleware->appendToGroup('api', RecordLastSeen::class);
     })

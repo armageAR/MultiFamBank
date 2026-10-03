@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccessRequestController;
 use App\Http\Controllers\Admin\BankSetupController;
 use App\Http\Controllers\Admin\ClientController as AdminClientController;
 use App\Http\Controllers\Admin\OperationController as AdminOperationController;
@@ -44,6 +45,8 @@ Route::prefix('auth')->group(function () {
         Route::put('/profile', [ProfileController::class, 'update'])->middleware('throttle:10,1');
     });
 });
+
+Route::post('/access-requests', [AccessRequestController::class, 'store'])->middleware('throttle:access-requests');
 
 Route::prefix('invitations/{token}')->middleware('throttle:auth')->group(function () {
     Route::get('/', [InvitationController::class, 'show']);

@@ -282,6 +282,8 @@ Everything runs in one Railway project, defined in `.railway/railway.ts`:
 | `api` | `apps/api` | Railpack (FrankenPHP). Runs migrations before each deploy; health check at `/api/health`. |
 | `client`, `admin`, `superadmin` | Repository root | Built with `pnpm turbo run build --filter=…` and served as SPAs. `VITE_API_URL` points at the API domain. |
 
+The public FamBank page (`apps/landing`, one static page in Spanish) answers at `https://fambank.armage.tech` in production. Its form posts to `POST /api/access-requests`, which stores one request per email (`access_requests` table) and emails `ACCESS_REQUEST_NOTIFY_EMAIL` through `ACCESS_REQUEST_MAILER` (falls back to `MAIL_MAILER`); both are Railway variables of the `api` service.
+
 The production client app is at `https://multifambank-armage.up.railway.app`. Its public `/links` page lists the address of every app in production and staging; update `apps/client/src/routes/Links.tsx` when a domain changes. The API's frontend URLs and CORS origins reference the services' Railway domains, so after renaming a domain, redeploy the `api` service in that environment.
 
 Each service has watch patterns so a change only redeploys the services it affects. Review infrastructure changes with `railway config plan` before `railway config apply` (evaluating the file requires Node.js 22+). The CLI applies the plan to the linked environment, so run it once per environment (`railway environment link staging`, then `production`).
