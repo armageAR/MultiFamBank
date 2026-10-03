@@ -1,9 +1,10 @@
 import { fetchExpenseReport, toApiError } from '@multifambank/api-client'
-import { Alert, Card, formatArs, formatDate, formatUsd } from '@multifambank/ui'
+import { Alert, Button, Card, formatArs, formatDate, formatUsd } from '@multifambank/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../api'
 import { keys } from '../queries'
+import { MovementsModal } from './MovementsModal'
 
 function shift(month: string, delta: number): string {
   const [year, m] = month.split('-').map(Number)
@@ -21,6 +22,7 @@ const label = (month: string) => {
 export function ReportTab() {
   const [month, setMonth] = useState(currentMonth)
   const [open, setOpen] = useState<number | null>(null)
+  const [detail, setDetail] = useState(false)
   const report = useQuery({ queryKey: keys.report(month), queryFn: () => fetchExpenseReport(api, month) })
 
   return (
@@ -40,6 +42,11 @@ export function ReportTab() {
           ›
         </button>
       </div>
+
+      <Button variant="secondary" onClick={() => setDetail(true)}>
+        Ver movimientos del mes
+      </Button>
+      {detail && <MovementsModal month={month} monthLabel={label(month)} onClose={() => setDetail(false)} />}
 
       {report.isPending ? (
         <p className="text-center text-sm text-gray-500">Cargando…</p>

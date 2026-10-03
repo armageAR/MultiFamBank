@@ -171,6 +171,43 @@ class AdminClientsTest extends TestCase
         $this->assertSame('1000.00', $dashboard['exchange_rates']['blue']['buy']);
     }
 
+    public function test_monthly_movements_with_opening_and_closing_balance(): void
+    {
+        $sofia = $this->client('sofia@example.com');
+        $tomas = $this->client('tomas@example.com');
+        $record = fn ($m, $data) => $this->postJson("/api/admin/clients/{$m->id}/operations", $data)->assertCreated();
+        $record($sofia, ['type' => 'savings_deposit', 'amount_ars' => '100000', 'exchange_rate' => '1000', 'description' => 'Ahorro', 'occurred_at' => '2026-08-05T15:00:00Z']);
+        $record($tomas, ['type' => 'savings_deposit', 'amount_ars' => '20000', 'exchange_rate' => '1000', 'occurred_at' => '2026-08-06T15:00:00Z']);
+        $record($sofia, ['type' => 'savings_deposit', 'amount_ars' => '50000', 'exchange_rate' => '1000', 'description' => 'Regalo', 'occurred_at' => '2026-09-02T15:00:00Z']);
+        $record($sofia, ['type' => 'savings_withdrawal', 'amount_ars' => '30000', 'exchange_rate' => '1000', 'occurred_at' => '2026-09-20T15:00:00Z']);
+        $record($tomas, ['type' => 'savings_withdrawal', 'amount_ars' => '5000', 'exchange_rate' => '1000', 'occurred_at' => '2026-09-10T15:00:00Z']);
+        $record($sofia, ['type' => 'expense', 'amount_ars' => '15000', 'description' => 'Cine', 'occurred_at' => '2026-09-12T15:00:00Z']);
+        $record($tomas, ['type' => 'expense', 'amount_ars' => '4000', 'description' => 'Útiles', 'occurred_at' => '2026-09-03T15:00:00Z']);
+        // October: after the month, so it changes neither the closing balance nor the list.
+        $record($sofia, ['type' => 'savings_deposit', 'amount_ars' => '10000', 'exchange_rate' => '1000', 'occurred_at' => '2026-10-02T15:00:00Z']);
+
+        $all = $this->getJson('/api/admin/reports/movements?month=2026-09')->assertOk()->json('data');
+        $this->assertSame('19000.00', $all['expenses']['total_ars']);
+        $this->assertSame(['Útiles', 'Cine'], array_column($all['expenses']['items'], 'description'));
+        $this->assertSame('120.00', $all['savings']['opening_usd']);
+        $this->assertSame('50.00', $all['savings']['deposits_usd']);
+        $this->assertSame('35.00', $all['savings']['withdrawals_usd']);
+        $this->assertSame('135.00', $all['savings']['closing_usd']);
+        $this->assertSame(['deposit', 'withdrawal', 'withdrawal'], array_column($all['savings']['items'], 'type'));
+        $this->assertSame(['170.00', '165.00', '135.00'], array_column($all['savings']['items'], 'balance_usd'));
+        $this->assertSame('Regalo', $all['savings']['items'][0]['description']);
+
+        $one = $this->getJson("/api/admin/reports/movements?month=2026-09&membership_id={$sofia->id}")->assertOk()->json('data');
+        $this->assertSame('100.00', $one['savings']['opening_usd']);
+        $this->assertSame('120.00', $one['savings']['closing_usd']);
+        $this->assertSame('15000.00', $one['expenses']['total_ars']);
+        $this->assertCount(2, $one['savings']['items']);
+
+        $other = Bank::create(['name' => 'Otra', 'admin_email' => 'x@example.com', 'status' => BankStatus::Active]);
+        $foreign = $other->memberships()->create(['user_id' => User::factory()->create()->id]);
+        $this->getJson("/api/admin/reports/movements?month=2026-09&membership_id={$foreign->id}")->assertJsonValidationErrors('membership_id');
+    }
+
     public function test_resending_waits_five_minutes_between_emails(): void
     {
         $created = $this->postJson('/api/admin/clients/invitations', ['email' => 'nico@example.com', 'name' => 'Nico'])

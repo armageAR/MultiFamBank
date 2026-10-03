@@ -8,6 +8,7 @@ export const keys = {
   clients: ['admin', 'clients'] as const,
   history: (membershipId: number) => ['admin', 'history', membershipId] as const,
   report: (month: string) => ['admin', 'report', month] as const,
+  movements: (month: string, membershipId?: number) => ['admin', 'report', month, 'movements', membershipId ?? 'all'] as const,
   rates: ['exchange-rates'] as const,
 }
 

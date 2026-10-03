@@ -71,6 +71,74 @@ class BankReports
         ];
     }
 
+    /**
+     * Every movement of a month (YYYY-MM), for the whole bank or one client: bank-funded expenses with
+     * their total, and savings deposits and withdrawals between the opening and closing balance (USD).
+     */
+    public function monthlyMovements(Bank $bank, string $month, ?int $membershipId = null): array
+    {
+        [$from, $to] = $this->monthRange($bank, $month);
+        $scoped = fn () => LedgerEntry::where('bank_id', $bank->id)->when($membershipId, fn ($q) => $q->where('bank_membership_id', $membershipId));
+
+        $entries = $scoped()->with('membership.user')->whereBetween('occurred_at', [$from, $to])->orderBy('occurred_at')->orderBy('id')->get();
+        $expenses = $entries->where('kind', LedgerEntryKind::BankExpense)->values();
+        $savings = $entries->where('kind', '!=', LedgerEntryKind::BankExpense)->values();
+
+        // Opening balance: today's balance minus everything from the start of the month on, so it
+        // always agrees with the balances the app shows.
+        $current = SavingsAccount::where('bank_id', $bank->id)->when($membershipId, fn ($q) => $q->where('bank_membership_id', $membershipId))
+            ->toBase()->selectRaw('coalesce(sum(balance_usd), 0) as total')->value('total');
+        $since = $scoped()->where('occurred_at', '>=', $from)->toBase()
+            ->selectRaw('coalesce(sum(case when kind = ? then amount_usd else 0 end), 0) as credits', [LedgerEntryKind::SavingsCredit->value])
+            ->selectRaw('coalesce(sum(case when kind = ? then amount_usd else 0 end), 0) as debits', [LedgerEntryKind::SavingsDebit->value])
+            ->first();
+        $opening = Money::add(Money::sub(bcadd((string) $current, '0', 2), bcadd((string) $since->credits, '0', 2)), bcadd((string) $since->debits, '0', 2));
+
+        $balance = $opening;
+        $deposits = '0.00';
+        $withdrawals = '0.00';
+        $items = $savings->map(function (LedgerEntry $e) use (&$balance, &$deposits, &$withdrawals) {
+            $deposit = $e->kind === LedgerEntryKind::SavingsCredit;
+            $usd = (string) $e->amount_usd;
+            $balance = $deposit ? Money::add($balance, $usd) : Money::sub($balance, $usd);
+            $deposit ? $deposits = Money::add($deposits, $usd) : $withdrawals = Money::add($withdrawals, $usd);
+
+            return [
+                'money_request_id' => $e->money_request_id,
+                'occurred_at' => $e->occurred_at,
+                'client' => $e->membership->user->name,
+                'type' => $deposit ? 'deposit' : 'withdrawal',
+                'description' => $e->description,
+                'amount_ars' => (string) $e->amount_ars,
+                'exchange_rate' => (string) $e->exchange_rate,
+                'amount_usd' => $usd,
+                'balance_usd' => $balance,
+            ];
+        });
+
+        return [
+            'month' => $month,
+            'timezone' => $bank->timezone,
+            'expenses' => [
+                'total_ars' => $expenses->reduce(fn ($sum, $e) => Money::add($sum, (string) $e->amount_ars), '0.00'),
+                'items' => $expenses->map(fn (LedgerEntry $e) => [
+                    'money_request_id' => $e->money_request_id,
+                    'occurred_at' => $e->occurred_at,
+                    'client' => $e->membership->user->name,
+                    'description' => $e->description,
+                    'amount_ars' => (string) $e->amount_ars,
+                ])->values(),
+            ],
+            'savings' => [
+                'opening_usd' => $opening,
+                'deposits_usd' => $deposits,
+                'withdrawals_usd' => $withdrawals,
+                'closing_usd' => $balance,
+                'items' => $items->values(),
+            ],
+        ];
+    }
+
     /** @return array{0: Carbon, 1: Carbon} UTC bounds of a calendar month in the bank's timezone. */
     private function monthRange(Bank $bank, string $month): array
     {
