@@ -31,7 +31,7 @@ export function ExpenseModal({ bankId, bankName, online, enqueue, onClose, onQue
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
           Es dinero del banco, no de tus ahorros. El administrador decide si lo aprueba.
         </p>
-        <TextField label="Monto en pesos" inputMode="decimal" placeholder="Ej: 15000" value={amount} onChange={(e) => setAmount(e.target.value)} error={error?.fields.amount_ars} />
+        <TextField label="Monto en pesos" inputMode="decimal" placeholder="Ej: 15000" value={amount} onChange={(e) => setAmount(e.target.value)} error={error?.fields.amount_ars} inputClassName="text-right" />
         <TextField
           label="¿Para qué es? (obligatorio)"
           placeholder="Ej: salida con amigos"

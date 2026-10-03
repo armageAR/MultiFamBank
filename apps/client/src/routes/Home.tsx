@@ -73,7 +73,7 @@ function OperationRow({
         <OperationTypeBadge type={operation.type} audience="client" />
         <OperationStatusBadge status={operation.status} />
       </div>
-      <div className="flex items-baseline justify-between gap-2">
+      <div className="text-right">
         <p className="text-base font-semibold text-gray-900">{formatArs(operation.amount_ars)}</p>
         {operation.amount_usd && <p className="text-xs text-gray-500">{formatUsd(operation.amount_usd)}</p>}
       </div>
@@ -115,7 +115,7 @@ function OutboxRow({ item, sending, onDiscard }: { item: OutboxRequest; sending:
           {rejected ? 'No se pudo enviar' : 'Pendiente de sincronización'}
         </span>
       </div>
-      <p className="text-base font-semibold text-gray-900">{formatArs(item.payload.amount_ars)}</p>
+      <p className="text-right text-base font-semibold text-gray-900">{formatArs(item.payload.amount_ars)}</p>
       {item.payload.description && <p className="text-sm text-gray-700">{item.payload.description}</p>}
       {rejected && <p className="text-xs text-red-600">{item.lastError}</p>}
       <div className="flex items-center justify-between text-xs text-gray-500">
@@ -256,14 +256,14 @@ function BankView({ membership, banks, syncedAt, highlightedOperation, onSwitch 
       )}
 
       <Card title="Mis ahorros">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-emerald-50 px-4 py-3">
+        <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+          <div className="rounded-xl bg-emerald-50 px-4 py-3 text-right">
             <p className="mb-1 text-xs text-emerald-700">Dólares</p>
-            <p className="text-xl font-bold text-emerald-700">{formatUsd(membership.balance_usd)}</p>
+            <p className="text-lg font-bold whitespace-nowrap text-emerald-700">{formatUsd(membership.balance_usd)}</p>
           </div>
-          <div className="rounded-xl bg-gray-50 px-4 py-3">
+          <div className="rounded-xl bg-gray-50 px-4 py-3 text-right">
             <p className="mb-1 text-xs text-gray-500">Pesos (blue compra)</p>
-            <p className="text-xl font-bold text-gray-900">{balanceArs !== null ? formatArs(Math.round(balanceArs)) : '—'}</p>
+            <p className="text-lg font-bold whitespace-nowrap text-gray-900">{balanceArs !== null ? formatArs(balanceArs) : '—'}</p>
           </div>
         </div>
         {Number(membership.reserved_usd) > 0 && (

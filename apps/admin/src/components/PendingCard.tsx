@@ -37,15 +37,13 @@ export function PendingCard({ operation, readOnly, onReview, onError }: Props) {
         </div>
         <OperationTypeBadge type={operation.type} audience="admin" />
       </div>
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <p className="text-xl font-bold text-gray-900">{formatArs(operation.amount_ars)}</p>
-          {operation.amount_usd && (
-            <p className="text-xs text-gray-500">
-              ≈ {formatUsd(operation.amount_usd)} a $ {Number(operation.exchange_rate).toLocaleString('es-AR')}
-            </p>
-          )}
-        </div>
+      <div className="text-right">
+        <p className="text-xl font-bold text-gray-900">{formatArs(operation.amount_ars)}</p>
+        {operation.amount_usd && operation.exchange_rate && (
+          <p className="text-xs text-gray-500">
+            ≈ {formatUsd(operation.amount_usd)} a {formatArs(operation.exchange_rate)}
+          </p>
+        )}
       </div>
       {operation.description && <p className="rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-700">{operation.description}</p>}
       {!readOnly && (
