@@ -48,7 +48,7 @@ export function ReportTab() {
       ) : (
         <>
           <Card title="Gastos pagados por el banco">
-            <p className="text-2xl font-bold text-gray-900">{formatArs(report.data.total_ars)}</p>
+            <p className="text-right text-2xl font-bold text-gray-900">{formatArs(report.data.total_ars)}</p>
             {report.data.by_client.length === 0 ? (
               <p className="mt-2 text-sm text-gray-500">No hubo gastos este mes.</p>
             ) : (
@@ -82,13 +82,13 @@ export function ReportTab() {
             )}
           </Card>
           <Card title="Movimientos de ahorros (no son gastos)">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-emerald-50 px-4 py-3">
+            <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+              <div className="rounded-xl bg-emerald-50 px-4 py-3 text-right">
                 <p className="text-xs text-emerald-700">Depósitos</p>
                 <p className="text-base font-bold text-emerald-700">{formatArs(report.data.savings.deposits_ars)}</p>
                 <p className="text-xs text-emerald-700">{formatUsd(report.data.savings.deposits_usd)}</p>
               </div>
-              <div className="rounded-xl bg-gray-50 px-4 py-3">
+              <div className="rounded-xl bg-gray-50 px-4 py-3 text-right">
                 <p className="text-xs text-gray-500">Retiros</p>
                 <p className="text-base font-bold text-gray-900">{formatArs(report.data.savings.withdrawals_ars)}</p>
                 <p className="text-xs text-gray-500">{formatUsd(report.data.savings.withdrawals_usd)}</p>

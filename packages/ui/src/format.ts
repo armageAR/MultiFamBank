@@ -4,9 +4,8 @@ export function formatNumber(value: string | number, decimals = 2): string {
 }
 
 export const formatUsd = (value: string | number) => `USD ${formatNumber(value)}`
-/** Pesos without decimals unless there are cents. */
-export const formatArs = (value: string | number) =>
-  `$ ${Number(value).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+/** Always with cents, even when round: "$ 150.000,00". */
+export const formatArs = (value: string | number) => `$ ${formatNumber(value)}`
 
 /**
  * Reads amounts as people type them in Argentina: "15000", "15.000", "15.000,50", "1415,125" or

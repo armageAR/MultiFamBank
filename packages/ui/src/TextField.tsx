@@ -6,9 +6,11 @@ interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string
   error?: string
   hint?: string
+  /** Extra classes for the input itself, e.g. "text-right" for amounts. */
+  inputClassName?: string
 }
 
-export function TextField({ label, error, hint, id, className = '', ...props }: TextFieldProps) {
+export function TextField({ label, error, hint, id, className = '', inputClassName = '', ...props }: TextFieldProps) {
   const styles = fieldStyles[useLook()]
   const generatedId = useId()
   const inputId = id ?? generatedId
@@ -24,7 +26,7 @@ export function TextField({ label, error, hint, id, className = '', ...props }: 
         id={inputId}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
-        className={`${styles.control} ${error ? styles.invalid : styles.valid}`}
+        className={`${styles.control} ${error ? styles.invalid : styles.valid} ${inputClassName}`}
       />
       {error ? (
         <p id={`${inputId}-error`} className={styles.error}>

@@ -71,9 +71,13 @@ function Row({ operation, readOnly }: { operation: Operation; readOnly: boolean 
         <OperationTypeBadge type={operation.type} audience="admin" />
         <OperationStatusBadge status={operation.status} />
       </div>
-      <div className="flex items-baseline justify-between gap-2">
+      <div className="text-right">
         <p className="text-base font-semibold text-gray-900">{formatArs(operation.amount_ars)}</p>
-        {operation.amount_usd && <p className="text-xs text-gray-500">{formatUsd(operation.amount_usd)} · $ {Number(operation.exchange_rate).toLocaleString('es-AR')}</p>}
+        {operation.amount_usd && operation.exchange_rate && (
+          <p className="text-xs text-gray-500">
+            {formatUsd(operation.amount_usd)} a {formatArs(operation.exchange_rate)}
+          </p>
+        )}
       </div>
       {operation.description && <p className="text-sm text-gray-700">{operation.description}</p>}
       {operation.changed_by_admin && (
@@ -110,12 +114,12 @@ export function HistoryModal({ client, readOnly, onClose }: { client: AdminClien
 
   return (
     <Modal title={`Historial · ${client.name}`} onClose={onClose}>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-xl bg-emerald-50 px-4 py-3">
+      <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+        <div className="rounded-xl bg-emerald-50 px-4 py-3 text-right">
           <p className="text-xs text-emerald-700">Saldo</p>
           <p className="text-lg font-bold text-emerald-700">{formatUsd(client.balance_usd)}</p>
         </div>
-        <div className="rounded-xl bg-gray-50 px-4 py-3">
+        <div className="rounded-xl bg-gray-50 px-4 py-3 text-right">
           <p className="text-xs text-gray-500">Disponible</p>
           <p className="text-lg font-bold text-gray-900">{formatUsd(client.available_usd)}</p>
         </div>

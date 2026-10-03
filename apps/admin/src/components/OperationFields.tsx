@@ -1,6 +1,6 @@
 import type { ExchangeRates, OperationType } from '@multifambank/api-client'
 import { suggestedRate, type OperationDraft } from '../operationDraft'
-import { operationLabels, SelectField, TextField, toAmountInput } from '@multifambank/ui'
+import { formatArs, operationLabels, SelectField, TextField, toAmountInput } from '@multifambank/ui'
 
 interface Props {
   draft: OperationDraft
@@ -43,6 +43,7 @@ export function OperationFields({ draft, onChange, errors, rates, disabled, date
         value={draft.amount}
         disabled={disabled}
         error={errors.amount_ars}
+        inputClassName="text-right"
         onChange={(e) => set({ amount: e.target.value })}
       />
       <TextField
@@ -61,7 +62,8 @@ export function OperationFields({ draft, onChange, errors, rates, disabled, date
           value={draft.rate}
           disabled={disabled}
           error={errors.exchange_rate}
-          hint={rates ? `Blue compra $ ${rates.blue.buy} · venta $ ${rates.blue.sell}` : undefined}
+          inputClassName="text-right"
+          hint={rates ? `Blue compra ${formatArs(rates.blue.buy)} · venta ${formatArs(rates.blue.sell)}` : undefined}
           onChange={(e) => set({ rate: e.target.value })}
         />
       )}

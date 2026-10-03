@@ -1,5 +1,5 @@
 import { fetchAdminDashboard, fetchExchangeRates, toApiError } from '@multifambank/api-client'
-import { Alert, Card, formatArs, formatNumber, formatUsd } from '@multifambank/ui'
+import { Alert, Card, formatArs, formatUsd } from '@multifambank/ui'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../api'
@@ -14,7 +14,7 @@ function Quote({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-gray-50 px-4 py-3">
       <p className="text-right text-xs text-gray-500">{label}</p>
-      <p className="text-right text-xl font-bold text-gray-900">$ {formatNumber(value, 0)}</p>
+      <p className="text-right text-xl font-bold whitespace-nowrap text-gray-900">{formatArs(value)}</p>
     </div>
   )
 }
@@ -49,16 +49,16 @@ export function DashboardTab() {
   return (
     <div className="flex flex-col gap-4">
       <Card title="Ahorros de los clientes">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-emerald-50 px-4 py-3">
+        <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+          <div className="rounded-xl bg-emerald-50 px-4 py-3 text-right">
             <p className="mb-1 text-xs text-emerald-700">Dólares</p>
-            <p className="text-xl font-bold text-emerald-700">{formatUsd(data.balance_usd)}</p>
+            <p className="text-lg font-bold whitespace-nowrap text-emerald-700">{formatUsd(data.balance_usd)}</p>
           </div>
-          <div className="rounded-xl bg-gray-50 px-4 py-3">
+          <div className="rounded-xl bg-gray-50 px-4 py-3 text-right">
             <p className="mb-1 text-xs text-gray-500">
               Pesos <span className="text-gray-500">(blue compra)</span>
             </p>
-            <p className="text-xl font-bold text-gray-900">{totalArs !== null ? formatArs(totalArs) : '—'}</p>
+            <p className="text-lg font-bold whitespace-nowrap text-gray-900">{totalArs !== null ? formatArs(totalArs) : '—'}</p>
           </div>
         </div>
         {Number(data.reserved_usd) > 0 && (
@@ -68,10 +68,10 @@ export function DashboardTab() {
         )}
       </Card>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
         <Card title="Gastos del banco">
-          <p className="text-xl font-bold text-gray-900">{formatArs(data.month_expenses_ars)}</p>
-          <p className="mt-1 text-xs text-gray-500">{monthName(data.month)}</p>
+          <p className="text-right text-xl font-bold whitespace-nowrap text-gray-900">{formatArs(data.month_expenses_ars)}</p>
+          <p className="mt-1 text-right text-xs text-gray-500">{monthName(data.month)}</p>
         </Card>
         <Card title="Clientes">
           <p className="text-xl font-bold text-gray-900">{data.clients}</p>
@@ -90,14 +90,14 @@ export function DashboardTab() {
                 </button>
               </div>
               {refreshError && <p className="mb-2 text-xs text-red-600">{refreshError}</p>}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
                 <Quote label="Compra" value={rates.blue.buy} />
                 <Quote label="Venta" value={rates.blue.sell} />
               </div>
             </div>
             <div>
               <p className="mb-2 text-xs text-gray-500">Dólar oficial</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
                 <Quote label="Compra" value={rates.oficial.buy} />
                 <Quote label="Venta" value={rates.oficial.sell} />
               </div>
