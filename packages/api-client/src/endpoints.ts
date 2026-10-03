@@ -7,6 +7,7 @@ import type {
   ClientInvitation,
   ExchangeRates,
   ExpenseReport,
+  MovementsReport,
   InvitationResult,
   NewOperation,
   Operation,
@@ -187,6 +188,11 @@ export async function fetchAdminDashboard(client: AxiosInstance): Promise<AdminD
 
 export async function fetchExpenseReport(client: AxiosInstance, month: string): Promise<ExpenseReport> {
   const { data } = await client.get<{ data: ExpenseReport }>('/admin/reports/expenses', { params: { month } })
+  return data.data
+}
+
+export async function fetchMovementsReport(client: AxiosInstance, month: string, membershipId?: number): Promise<MovementsReport> {
+  const { data } = await client.get<{ data: MovementsReport }>('/admin/reports/movements', { params: { month, membership_id: membershipId } })
   return data.data
 }
 

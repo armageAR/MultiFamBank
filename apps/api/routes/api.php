@@ -65,6 +65,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', EnsureBankAdmin::class])->gr
     Route::put('/bank', [BankSetupController::class, 'update']);
     Route::get('/dashboard', [ReportController::class, 'dashboard']);
     Route::get('/reports/expenses', [ReportController::class, 'expenses']);
+    Route::get('/reports/movements', [ReportController::class, 'movements']);
 
     Route::get('/clients', [AdminClientController::class, 'index']);
     Route::post('/clients/invitations', [AdminClientController::class, 'invite']);

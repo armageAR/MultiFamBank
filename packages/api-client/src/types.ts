@@ -204,6 +204,33 @@ export interface ExpenseReport {
   savings: { deposits_ars: string; deposits_usd: string; withdrawals_ars: string; withdrawals_usd: string }
 }
 
+/** A month's movements in detail; savings run from the opening to the closing balance (USD). */
+export interface MovementsReport {
+  month: string
+  timezone: string
+  expenses: {
+    total_ars: string
+    items: { money_request_id: string; occurred_at: string; client: string; description: string | null; amount_ars: string }[]
+  }
+  savings: {
+    opening_usd: string
+    deposits_usd: string
+    withdrawals_usd: string
+    closing_usd: string
+    items: {
+      money_request_id: string
+      occurred_at: string
+      client: string
+      type: 'deposit' | 'withdrawal'
+      description: string | null
+      amount_ars: string
+      exchange_rate: string
+      amount_usd: string
+      balance_usd: string
+    }[]
+  }
+}
+
 // ── Client ────────────────────────────────────────────────────────────────────
 
 export interface ClientBank {
