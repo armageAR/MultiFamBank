@@ -15,6 +15,8 @@ export function createTokenStore(key: string) {
   }
 
   return {
+    /** Storage key; other per-session data of the app is stored next to it. */
+    key,
     get(): string | null {
       try {
         return localStorage.getItem(key)

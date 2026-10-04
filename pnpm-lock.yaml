@@ -278,12 +278,18 @@ importers:
       '@types/react':
         specifier: ^19.2.18
         version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.2.7
+        version: 19.3.0(@types/react@19.3.0)
       axios:
         specifier: ^1.20.0
         version: 1.20.0
       react:
         specifier: ^19.2.8
         version: 19.3.0
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.3.0(react@19.3.0)
       react-router:
         specifier: ^7.13.0
         version: 7.18.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
