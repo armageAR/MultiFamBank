@@ -2,6 +2,7 @@ import { toApiError, updateProfile, type ApiError, type User } from '@multifamba
 import { Alert, Button, Modal, TextField } from '@multifambank/ui'
 import type { AxiosInstance } from 'axios'
 import { useState, type FormEvent } from 'react'
+import { AppLockSetting } from './AppLockSetting'
 import { useAuth } from './session'
 
 interface AccountModalProps {
@@ -57,6 +58,7 @@ export function AccountModal({ api, user, title = 'Mi cuenta', nameNote, savedMe
           <p className="mt-1 text-sm text-gray-900">{user.name}</p>
           <p className="text-xs text-gray-500">{nameNote}</p>
         </div>
+        <AppLockSetting />
         {done && <Alert tone="success">{done}</Alert>}
         {error && !error.fields.email && !error.fields.password && !error.fields.current_password && <Alert tone="error">{error.message}</Alert>}
         <TextField
