@@ -69,6 +69,22 @@ class AuthTest extends TestCase
         $this->postJson('/api/auth/login', ['email' => 'root@example.com', 'password' => 'nueva-clave-segura'])->assertOk();
     }
 
+    public function test_password_reset_email_is_in_spanish(): void
+    {
+        // Production runs with APP_LOCALE=es; Laravel's own email texts come from lang/es.json.
+        app()->setLocale('es');
+        $mail = (new ResetPassword('token'))->toMail(User::factory()->create());
+        $html = (string) $mail->render();
+
+        $this->assertSame('Restablecé tu contraseña', $mail->subject);
+        foreach (['¡Hola!', 'Restablecer contraseña', 'El link vence en 60 minutos.', 'Saludos,', 'no funciona, copiá y pegá', 'Todos los derechos reservados.'] as $text) {
+            $this->assertStringContainsString($text, $html);
+        }
+        foreach (['Hello', 'Reset Password', 'Regards', 'trouble clicking', 'All rights reserved'] as $text) {
+            $this->assertStringNotContainsString($text, $html);
+        }
+    }
+
     public function test_forgot_password_does_not_reveal_unknown_emails(): void
     {
         $this->postJson('/api/auth/forgot-password', ['email' => 'nobody@example.com'])->assertOk();
