@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { useTurnstile } from './useTurnstile'
+import { useTurnstile } from '@multifambank/ui/turnstile'
 
 const apiUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/$/, '')
 

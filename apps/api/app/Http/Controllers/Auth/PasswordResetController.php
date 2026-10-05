@@ -4,18 +4,26 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Turnstile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 
 class PasswordResetController extends Controller
 {
     /** @unauthenticated */
-    public function forgot(Request $request): JsonResponse
+    public function forgot(Request $request, Turnstile $turnstile): JsonResponse
     {
-        $data = $request->validate(['email' => ['required', 'email']]);
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            // Cloudflare Turnstile token, when the check is on.
+            'turnstile_token' => ['nullable', 'string'],
+        ]);
+
+        $turnstile->ensureHuman($request);
 
         Password::sendResetLink(['email' => User::normalizeEmail($data['email'])]);
 
@@ -39,6 +47,8 @@ class PasswordResetController extends Controller
                 // Sign out every other session, and stop notifications to their devices.
                 $user->tokens()->delete();
                 $user->pushSubscriptions()->delete();
+                // Whoever proves they own the email gets past a sign-in lockout.
+                RateLimiter::clear(AuthController::failuresKey($user->email));
             },
         );
 

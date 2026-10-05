@@ -1,0 +1,50 @@
+# Web server of every frontend (client, admin, superadmin, landing) on Railway. Railpack's default
+# for static sites (core/providers/node/Caddyfile.template in railwayapp/railpack) plus security
+# headers. Railpack fills {{.DIST_DIR}} with each service's RAILPACK_SPA_OUTPUT_DIR.
+{
+	admin off
+	persist_config off
+	auto_https off
+
+	log {
+		format json
+	}
+
+	servers {
+		trusted_proxies static private_ranges 100.0.0.0/8 # trust railway's proxy
+	}
+}
+
+:{$PORT:80} {
+	log {
+		format json
+	}
+
+	respond /health 200
+
+	header {
+		X-Content-Type-Options "nosniff"
+		# No page may be framed by another site: blocks clickjacking on the sign-in forms.
+		X-Frame-Options "DENY"
+		Content-Security-Policy "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Strict-Transport-Security "max-age=31536000"
+		# Fingerprint/face unlock uses WebAuthn, which stays allowed.
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		-Server
+	}
+
+	root * {{.DIST_DIR}}
+
+	file_server {
+		hide .git
+		hide .env*
+	}
+
+	encode {
+		gzip
+		zstd
+	}
+
+	try_files {path} {path}.html {path}/index.html{{if .IndexFallback}} /index.html{{end}}
+}

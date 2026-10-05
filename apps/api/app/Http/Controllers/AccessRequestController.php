@@ -37,9 +37,7 @@ class AccessRequestController extends Controller
         ]);
 
         // Before looking the email up, so the form cannot be used to probe which emails asked.
-        if (! $turnstile->verify($data['turnstile_token'] ?? null, $request->ip())) {
-            throw ValidationException::withMessages(['turnstile_token' => 'No pudimos confirmar que seas una persona. Probá de nuevo.']);
-        }
+        $turnstile->ensureHuman($request);
 
         $email = User::normalizeEmail($data['email']);
         if (AccessRequest::where('email', $email)->exists()) {

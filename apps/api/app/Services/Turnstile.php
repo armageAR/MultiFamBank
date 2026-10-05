@@ -2,13 +2,15 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
- * Cloudflare Turnstile: confirms that a public form was sent by a person. Without a secret key
- * (local development, tests) the check is off.
+ * Cloudflare Turnstile: confirms that a public form (access request, sign-in, forgotten password)
+ * was sent by a person. Without a secret key (local development, tests) the check is off.
  */
 class Turnstile
 {
@@ -17,6 +19,16 @@ class Turnstile
     public function enabled(): bool
     {
         return filled(config('multifambank.turnstile.secret_key'));
+    }
+
+    /** Rejects the request unless its `turnstile_token` proves a person sent it. */
+    public function ensureHuman(Request $request): void
+    {
+        $token = $request->input('turnstile_token');
+
+        if (! $this->verify(is_string($token) ? $token : null, $request->ip())) {
+            throw ValidationException::withMessages(['turnstile_token' => 'No pudimos confirmar que seas una persona. Recargá la página y probá de nuevo.']);
+        }
     }
 
     /** Each token is valid once; an unreachable Cloudflare counts as not verified. */

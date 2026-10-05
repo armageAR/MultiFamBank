@@ -16,6 +16,7 @@ export { SelectField } from './SelectField'
 export { StatusBadge } from './StatusBadge'
 export { TextField } from './TextField'
 export { formatCountdown, useCountdown } from './useCountdown'
+export { useTurnstile, type TurnstileState } from './useTurnstile'
 export {
   formatArs,
   formatDate,

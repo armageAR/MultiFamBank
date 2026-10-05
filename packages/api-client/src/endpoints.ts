@@ -34,8 +34,9 @@ export async function fetchHealth(client: AxiosInstance): Promise<HealthResponse
 
 // Authentication
 
-export async function login(client: AxiosInstance, email: string, password: string): Promise<AuthResponse> {
-  const { data } = await client.post<AuthResponse>('/auth/login', { email, password })
+/** `turnstileToken` proves a person is signing in; required when the API has Turnstile on. */
+export async function login(client: AxiosInstance, email: string, password: string, turnstileToken?: string): Promise<AuthResponse> {
+  const { data } = await client.post<AuthResponse>('/auth/login', { email, password, turnstile_token: turnstileToken || undefined })
   return data
 }
 
@@ -48,8 +49,8 @@ export async function logout(client: AxiosInstance): Promise<void> {
   await client.post('/auth/logout')
 }
 
-export async function forgotPassword(client: AxiosInstance, email: string): Promise<string> {
-  const { data } = await client.post<{ message: string }>('/auth/forgot-password', { email })
+export async function forgotPassword(client: AxiosInstance, email: string, turnstileToken?: string): Promise<string> {
+  const { data } = await client.post<{ message: string }>('/auth/forgot-password', { email, turnstile_token: turnstileToken || undefined })
   return data.message
 }
 

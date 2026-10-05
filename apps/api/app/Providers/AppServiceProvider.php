@@ -40,8 +40,12 @@ class AppServiceProvider extends ServiceProvider
             return [Limit::perMinute(5)->by($request->ip()), Limit::perDay(20)->by($request->ip())];
         });
 
+        // Per email and IP, plus a cap per IP so one address cannot try many accounts.
         RateLimiter::for('auth', function (Request $request) {
-            return Limit::perMinute(10)->by(mb_strtolower((string) $request->input('email')).'|'.$request->ip());
+            return [
+                Limit::perMinute(10)->by(mb_strtolower((string) $request->input('email')).'|'.$request->ip()),
+                Limit::perMinute(30)->by('ip|'.$request->ip()),
+            ];
         });
     }
 }
