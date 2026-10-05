@@ -45,11 +45,17 @@ const ICONS = {
 
 /** Removes the staging-only markers so captures look like the real product. */
 const cleanStaging = () => {
+	// AuthLayout outlines its card in red outside production.
+	const style = document.createElement('style');
+	style.textContent = '.border-red-500{border-color:#f3f4f6!important;border-width:1px!important}';
+	document.addEventListener('DOMContentLoaded', () => document.head.appendChild(style));
 	const clean = () => {
 		document.querySelectorAll('header').forEach((h) => (h.style.borderTop = 'none'));
 		document.querySelectorAll('span, p, div').forEach((el) => {
 			if (el.children.length) return;
 			const t = el.textContent.trim();
+			// The product is called FamBank in the videos.
+			if (/^multifambank$/i.test(t)) el.textContent = 'FamBank';
 			if (/^staging$/i.test(t) || t === 'notif. bloqueadas' || /Entorno de pruebas/.test(t)) el.style.display = 'none';
 		});
 	};

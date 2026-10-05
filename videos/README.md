@@ -19,6 +19,7 @@ Workspace for demo videos of FamBank made with [Remotion](https://www.remotion.d
 | `QueEsFamBank` | 1920x1080 (16:9)  | 53 s   | What FamBank is, for the public page                           |
 | `ComoPide`     | 1080x1920 (9:16)  | 26 s   | A member deposits dollars and asks for money for an expense    |
 | `ComoAprueba`  | 1080x1920 (9:16)  | 26 s   | The bank reviews and confirms a request, then the month report |
+| `NuevaVersion` | 1080x1920 (9:16)  | 42.5 s | For old-version users: fingerprint unlock, home, the new expense requests |
 
 ## Usage
 
@@ -29,6 +30,7 @@ npx remotion studio                 # preview with hot reload (npm start)
 npx remotion render src/index.ts QueEsFamBank out/QueEsFamBank.mp4
 npx remotion render src/index.ts ComoPide out/ComoPide.mp4
 npx remotion render src/index.ts ComoAprueba out/ComoAprueba.mp4
+npx remotion render src/index.ts NuevaVersion out/NuevaVersion.mp4
 ```
 
 Rendered files go to `out/` (git-ignored).
@@ -55,6 +57,7 @@ export BANK_EMAIL=… BANK_PASS=… JACINTA_EMAIL=… JACINTA_PASS=…
 node scripts/capture.mjs static   # read-only screens: home, dashboard, report
 node scripts/capture.mjs client   # WRITES to staging: a USD 50 deposit and a $30.000 expense request
 node scripts/capture.mjs bank     # WRITES to staging: confirms the pending expense
+node scripts/capture.mjs intro    # read-only: login, fingerprint lock (Chrome's virtual authenticator), withdraw sheet
 ```
 
 The `client` and `bank` phases create data, so run them only when you need new request screens.

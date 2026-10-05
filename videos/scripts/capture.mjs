@@ -3,8 +3,10 @@
 //   static  read-only screens (home, dashboard, report)
 //   client  creates a USD deposit request and an expense request as Jacinta (writes to staging!)
 //   bank    reviews and confirms Jacinta's pending expense as the bank (writes to staging!)
+//   intro   login, fingerprint lock and withdraw sheet for the new-version intro (read-only; the
+//           lock lives in this browser's localStorage, with Chrome's virtual authenticator)
 import fs from 'node:fs';
-import {open, login, creds, CLIENT_URL, BANK_URL, MOBILE, DESKTOP} from './lib.mjs';
+import {open, login, prepare, creds, CLIENT_URL, BANK_URL, MOBILE, DESKTOP} from './lib.mjs';
 
 const SHOTS = new URL('../public/shots/', import.meta.url).pathname;
 fs.mkdirSync(SHOTS, {recursive: true});
@@ -114,7 +116,48 @@ async function bankPhase() {
 	}
 }
 
-const phases = {static: staticPhase, client: clientPhase, bank: bankPhase};
+async function introPhase() {
+	const {browser, context, page} = await open(MOBILE);
+	// A platform authenticator that always verifies, so "Desbloqueo con huella o cara" is offered.
+	const cdp = await context.newCDPSession(page);
+	await cdp.send('WebAuthn.enable');
+	await cdp.send('WebAuthn.addVirtualAuthenticator', {
+		options: {protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true},
+	});
+	const {email, password} = creds('JACINTA');
+	await prepare(page, CLIENT_URL);
+	await page.goto(`${CLIENT_URL}/ingresar`, {waitUntil: 'networkidle'});
+	await shot(page, 'intro-login-empty');
+	await page.getByLabel('Email').fill(email);
+	await page.getByLabel('Contraseña').fill(password);
+	await shot(page, 'intro-login-filled');
+	await page.getByRole('button', {name: 'Ingresar'}).click();
+	await page.getByRole('button', {name: 'Mi cuenta'}).click({timeout: 20000});
+	const lockSetting = page.getByText('Desbloqueo con huella o cara');
+	await lockSetting.waitFor();
+	await lockSetting.scrollIntoViewIfNeeded();
+	await shot(page, 'intro-account');
+	await page.getByRole('button', {name: 'Activar', exact: true}).click();
+	await page.getByText('Activo en este dispositivo').waitFor();
+	await shot(page, 'intro-account-on');
+
+	await page.reload({waitUntil: 'networkidle'});
+	await page.getByRole('button', {name: 'Desbloquear'}).waitFor();
+	await shot(page, 'intro-lock');
+	await page.getByRole('button', {name: 'Desbloquear'}).click();
+	await page.getByRole('button', {name: 'Depositar', exact: true}).waitFor();
+	await shot(page, 'intro-home');
+
+	await page.getByRole('button', {name: 'Retirar', exact: true}).click();
+	await page.getByText('Se usa esta cotización').waitFor();
+	await shot(page, 'intro-withdraw');
+	await page.getByRole('button', {name: 'Cancelar'}).click();
+
+	await shot(page, 'intro-movements', {fullPage: true, clip: {x: 0, y: 0, width: MOBILE.width, height: 1600}});
+	await browser.close();
+}
+
+const phases = {static: staticPhase, client: clientPhase, bank: bankPhase, intro: introPhase};
 const phase = phases[process.argv[2]];
 if (!phase) throw new Error(`Phase must be one of: ${Object.keys(phases).join(', ')}`);
 await phase();

@@ -8,9 +8,10 @@ import {colors, font} from '../theme';
 export const VerticalScene: React.FC<{
 	caption: string;
 	accent?: string;
+	captionSize?: number;
 	zoom?: {scale: number; x: number; y: number};
 	children: React.ReactNode;
-}> = ({caption, accent, zoom, children}) => {
+}> = ({caption, accent, captionSize = 70, zoom, children}) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
 	const enter = spring({frame, fps, config: {damping: 200}});
@@ -18,7 +19,7 @@ export const VerticalScene: React.FC<{
 		<AbsoluteFill>
 			<Backdrop />
 			<div style={{position: 'absolute', top: 120, left: 70, right: 70, height: 290, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-				<Caption text={caption} size={70} at={4} accent={accent} />
+				<Caption text={caption} size={captionSize} at={4} accent={accent} />
 			</div>
 			<div style={{position: 'absolute', top: 450, left: 0, right: 0, display: 'flex', justifyContent: 'center', opacity: enter, transform: `translateY(${(1 - enter) * 60}px)`}}>
 				<Phone width={600} zoom={zoom}>
