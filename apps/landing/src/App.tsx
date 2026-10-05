@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { AccessForm } from './AccessForm'
+import { SignInMenu, signInUrls } from './SignInMenu'
 
 const staging = import.meta.env.VITE_APP_ENV === 'staging'
 
@@ -83,12 +84,16 @@ export function App() {
           <img src="/favicon.svg" alt="" className="size-10 rounded-xl shadow-md shadow-emerald-600/20" />
           <span className="text-xl font-black tracking-tight text-gray-900">FamBank</span>
         </a>
-        <a
-          href="#sumate"
-          className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-emerald-500 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
-        >
-          Quiero sumarme
-        </a>
+        <div className="flex items-center gap-2">
+          {signInUrls && <SignInMenu />}
+          {/* On phones the hero's own button invites to join; the header keeps only "Ingresar". */}
+          <a
+            href="#sumate"
+            className="hidden rounded-full bg-emerald-600 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-emerald-500 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-emerald-300 sm:inline-flex"
+          >
+            Quiero sumarme
+          </a>
+        </div>
       </header>
 
       <main>
@@ -155,6 +160,11 @@ export function App() {
                 <Check>El historial de cada integrante y un reporte mensual con los gastos y los movimientos de ahorro.</Check>
                 <Check>Te avisa cuando alguien pide algo.</Check>
               </ul>
+              {signInUrls && (
+                <a href={signInUrls.bank} className="mt-6 inline-flex font-extrabold text-sky-700 underline-offset-4 hover:underline">
+                  ¿Ya sos el banco de tu familia? Ingresá →
+                </a>
+              )}
             </article>
             <article className="rounded-3xl border-2 border-emerald-100 bg-emerald-50/50 p-6 sm:p-8">
               <p className="text-4xl" aria-hidden="true">
@@ -169,6 +179,11 @@ export function App() {
                 <Check>Siguen cada pedido y ven si el banco cambió algo.</Check>
                 <Check>Sin conexión pueden preparar el pedido: se envía solo cuando vuelve internet.</Check>
               </ul>
+              {signInUrls && (
+                <a href={signInUrls.client} className="mt-6 inline-flex font-extrabold text-emerald-700 underline-offset-4 hover:underline">
+                  ¿Ya tenés tu cuenta? Ingresá →
+                </a>
+              )}
             </article>
           </div>
         </section>
@@ -211,6 +226,16 @@ export function App() {
           <img src="/favicon.svg" alt="" className="size-6 rounded-md" />
           FamBank · El banco de tu familia
         </span>
+        {signInUrls && (
+          <nav aria-label="Ingresar" className="flex flex-wrap gap-x-4 gap-y-1">
+            <a href={signInUrls.bank} className="hover:text-gray-800">
+              Ingresar al banco
+            </a>
+            <a href={signInUrls.client} className="hover:text-gray-800">
+              Ingresar como integrante
+            </a>
+          </nav>
+        )}
         <span>© {new Date().getFullYear()} FamBank</span>
       </footer>
     </div>

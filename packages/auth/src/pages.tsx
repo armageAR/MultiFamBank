@@ -1,7 +1,7 @@
 import { forgotPassword, login, resetPassword, toApiError, type ApiError } from '@multifambank/api-client'
-import { Alert, AuthLayout, Button, TextField, useLinkClass } from '@multifambank/ui'
+import { Alert, AuthLayout, Button, TextField, useLinkClass, useTurnstile, type TurnstileState } from '@multifambank/ui'
 import type { AxiosInstance } from 'axios'
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent, type RefObject } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { useAuth } from './session'
 
@@ -14,6 +14,20 @@ interface PageProps {
 /** Paths shared by every frontend. */
 const paths = { login: '/ingresar', forgot: '/olvide-contrasena' }
 
+/**
+ * Why the form cannot be sent yet: Cloudflare Turnstile is still checking. If it could not run, the
+ * form is sent without a token and the API decides (it accepts it while the check is switched off).
+ */
+function humanCheckError(turnstile: TurnstileState): ApiError | null {
+  if (!turnstile.enabled || turnstile.token || turnstile.failed) return null
+  return { message: 'Esperá a que termine la verificación de seguridad y volvé a tocar el botón.', fields: {} }
+}
+
+/** Cloudflare Turnstile: confirms a person is sending the form, usually without a click. */
+function HumanCheck({ turnstile, container }: { turnstile: TurnstileState; container: RefObject<HTMLDivElement | null> }) {
+  return turnstile.enabled ? <div ref={container} className="min-h-[65px]" /> : null
+}
+
 export function LoginPage({ appName, api }: PageProps) {
   const link = useLinkClass()
   const { user, signIn } = useAuth()
@@ -21,17 +35,26 @@ export function LoginPage({ appName, api }: PageProps) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<ApiError | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const humanCheck = useRef<HTMLDivElement>(null)
+  const turnstile = useTurnstile(humanCheck)
 
   if (user) return <Navigate to="/" replace />
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
+    const pending = humanCheckError(turnstile)
+    if (pending) {
+      setError(pending)
+      return
+    }
     setSubmitting(true)
     setError(null)
     try {
-      const result = await login(api, email, password)
+      const result = await login(api, email, password, turnstile.token)
       signIn(result.token, result.user)
     } catch (err) {
+      // The token was used; a retry needs a new one.
+      turnstile.reset()
       setError(toApiError(err))
     } finally {
       setSubmitting(false)
@@ -60,6 +83,7 @@ export function LoginPage({ appName, api }: PageProps) {
           onChange={(e) => setPassword(e.target.value)}
           error={error?.fields.password}
         />
+        <HumanCheck turnstile={turnstile} container={humanCheck} />
         <Button type="submit" className="w-full" loading={submitting}>
           Ingresar
         </Button>
@@ -79,14 +103,24 @@ export function ForgotPasswordPage({ appName, api }: PageProps) {
   const [sent, setSent] = useState<string | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const humanCheck = useRef<HTMLDivElement>(null)
+  const turnstile = useTurnstile(humanCheck)
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
+    const pending = humanCheckError(turnstile)
+    if (pending) {
+      setError(pending)
+      return
+    }
     setSubmitting(true)
     setError(null)
     try {
-      setSent(await forgotPassword(api, email))
+      const message = await forgotPassword(api, email, turnstile.token)
+      turnstile.remove()
+      setSent(message)
     } catch (err) {
+      turnstile.reset()
       setError(toApiError(err))
     } finally {
       setSubmitting(false)
@@ -109,6 +143,7 @@ export function ForgotPasswordPage({ appName, api }: PageProps) {
             onChange={(e) => setEmail(e.target.value)}
             error={error?.fields.email}
           />
+          <HumanCheck turnstile={turnstile} container={humanCheck} />
           <Button type="submit" className="w-full" loading={submitting}>
             Enviarme un link
           </Button>

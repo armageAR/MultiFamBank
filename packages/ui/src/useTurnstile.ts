@@ -1,4 +1,16 @@
+/// <reference path="./env.d.ts" />
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+
+/** The parts of Cloudflare Turnstile's browser API that the forms use. */
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: HTMLElement, options: Record<string, unknown>) => string
+      reset: (widgetId: string) => void
+      remove: (widgetId: string) => void
+    }
+  }
+}
 
 const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY
 const scriptUrl = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
@@ -32,7 +44,10 @@ export interface TurnstileState {
   remove: () => void
 }
 
-/** Cloudflare Turnstile widget rendered into `container`; usually it passes without any click. */
+/**
+ * Cloudflare Turnstile widget rendered into `container`; usually it passes without any click. Used by
+ * the landing page's access form and by every app's sign-in and forgotten-password forms.
+ */
 export function useTurnstile(container: RefObject<HTMLDivElement | null>): TurnstileState {
   const widget = useRef<string | null>(null)
   const [token, setToken] = useState('')

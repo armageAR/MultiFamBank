@@ -2,20 +2,24 @@ import { defineRailway, github, postgres, preserve, project, service, volume } f
 
 const region = "us-east4-eqdc4a";
 
-// Cloudflare Turnstile on the landing page's access form. Staging uses Cloudflare's published test
-// keys (always pass); production's real keys live only in Railway.
+// Cloudflare Turnstile on the landing page's access form and on every app's sign-in and forgotten-
+// password forms. Staging uses Cloudflare's published test keys (always pass); production's real keys
+// live only in Railway, on landing (site key) and api (secret). The production widget is registered
+// for fambank.armage.tech, which also covers the apps' subdomains.
 const turnstileTestKeys = { site: "1x00000000000000000000AA", secret: "1x0000000000000000000000000000000AA" };
 
 // Frontends build from the repo root so they can resolve the pnpm workspace packages.
 function frontend(name: "client" | "admin" | "superadmin" | "landing", repo: ReturnType<typeof github>, environment: "production" | "staging") {
-  const turnstile: Record<string, string | ReturnType<typeof preserve>> = name === "landing" ? { VITE_TURNSTILE_SITE_KEY: environment === "production" ? preserve() : turnstileTestKeys.site } : {};
+  const siteKey = environment === "staging" ? turnstileTestKeys.site : name === "landing" ? preserve() : "${{landing.VITE_TURNSTILE_SITE_KEY}}";
+  // The public page links to the bank and client sign-in pages (never to the platform app).
+  const signInLinks = name === "landing" ? { VITE_ADMIN_APP_URL: "https://${{admin.RAILWAY_PUBLIC_DOMAIN}}", VITE_CLIENT_APP_URL: "https://${{client.RAILWAY_PUBLIC_DOMAIN}}" } : {};
 
   return service(name, {
     source: repo,
     replicas: { [region]: 1 },
     build: {
       buildCommand: `pnpm turbo run build --filter=@multifambank/${name}`,
-      watchPatterns: [`/apps/${name}/**`, "/packages/**", "/package.json", "/pnpm-lock.yaml", "/turbo.json"],
+      watchPatterns: [`/apps/${name}/**`, "/packages/**", "/package.json", "/pnpm-lock.yaml", "/turbo.json", "/Caddyfile.template"],
     },
     env: {
       RAILPACK_NODE_VERSION: "22",
@@ -23,7 +27,8 @@ function frontend(name: "client" | "admin" | "superadmin" | "landing", repo: Ret
       VITE_API_URL: "https://${{api.RAILWAY_PUBLIC_DOMAIN}}",
       // Non-production builds get a red "S" favicon and a STAGING marker in the UI.
       VITE_APP_ENV: environment,
-      ...turnstile,
+      VITE_TURNSTILE_SITE_KEY: siteKey,
+      ...signInLinks,
     },
   });
 }
