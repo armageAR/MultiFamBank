@@ -16,6 +16,11 @@ return [
         'mailer' => env('ACCESS_REQUEST_MAILER', env('MAIL_MAILER', 'log')),
     ],
 
+    // Cloudflare Turnstile on the landing page's access form. Without a secret the check is off.
+    'turnstile' => [
+        'secret_key' => env('TURNSTILE_SECRET_KEY'),
+    ],
+
     'invitation_ttl_days' => (int) env('INVITATION_TTL_DAYS', 7),
 
     // While email delivery is not configured (MAIL_MAILER=log), the API returns invitation links to

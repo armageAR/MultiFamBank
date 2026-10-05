@@ -6,6 +6,8 @@ use App\Mail\AccessRequestReceivedMail;
 use App\Models\AccessRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -18,7 +20,12 @@ class AccessRequestTest extends TestCase
     {
         parent::setUp();
         Mail::fake();
-        config(['multifambank.access_requests.notify_to' => 'owner@example.com', 'multifambank.access_requests.mailer' => 'resend']);
+        config([
+            'multifambank.access_requests.notify_to' => 'owner@example.com',
+            'multifambank.access_requests.mailer' => 'resend',
+            'multifambank.turnstile.secret_key' => null,
+        ]);
+        Http::preventStrayRequests();
     }
 
     public function test_a_request_is_stored_and_notifies_the_configured_recipient(): void
@@ -76,6 +83,38 @@ class AccessRequestTest extends TestCase
         $this->postJson('/api/access-requests', ['name' => 'Laura', 'email' => 'laura@example.com'])->assertCreated();
 
         $this->assertNull(AccessRequest::sole()->notified_at);
+        Mail::assertNothingSent();
+    }
+
+    public function test_with_turnstile_on_a_verified_person_gets_through(): void
+    {
+        config(['multifambank.turnstile.secret_key' => 'secret']);
+        Http::fake(['challenges.cloudflare.com/*' => Http::response(['success' => true])]);
+
+        $this->postJson('/api/access-requests', ['name' => 'Laura', 'email' => 'laura@example.com', 'turnstile_token' => 'token-ok'])->assertCreated();
+
+        Http::assertSent(fn (HttpRequest $request) => $request['secret'] === 'secret' && $request['response'] === 'token-ok' && $request['remoteip'] === '127.0.0.1');
+        $this->assertSame(1, AccessRequest::count());
+    }
+
+    public function test_with_turnstile_on_missing_rejected_or_unverifiable_tokens_are_refused(): void
+    {
+        config(['multifambank.turnstile.secret_key' => 'secret']);
+        // A known email must not be revealed to an unverified sender.
+        AccessRequest::create(['name' => 'Laura', 'email' => 'laura@example.com']);
+        Http::fakeSequence('challenges.cloudflare.com/*')
+            ->push(['success' => false, 'error-codes' => ['invalid-input-response']])
+            ->pushFailedConnection();
+
+        $this->postJson('/api/access-requests', ['name' => 'Bot', 'email' => 'laura@example.com'])
+            ->assertJsonValidationErrors(['turnstile_token' => 'No pudimos confirmar que seas una persona'])->assertJsonMissingValidationErrors('email');
+        $this->postJson('/api/access-requests', ['name' => 'Bot', 'email' => 'bot@example.com', 'turnstile_token' => 'token-falso'])
+            ->assertJsonValidationErrors('turnstile_token');
+        $this->postJson('/api/access-requests', ['name' => 'Bot', 'email' => 'bot@example.com', 'turnstile_token' => 'token'])
+            ->assertJsonValidationErrors('turnstile_token');
+
+        Http::assertSentCount(2);
+        $this->assertSame(1, AccessRequest::count());
         Mail::assertNothingSent();
     }
 

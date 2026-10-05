@@ -2,8 +2,14 @@ import { defineRailway, github, postgres, preserve, project, service, volume } f
 
 const region = "us-east4-eqdc4a";
 
+// Cloudflare Turnstile on the landing page's access form. Staging uses Cloudflare's published test
+// keys (always pass); production's real keys live only in Railway.
+const turnstileTestKeys = { site: "1x00000000000000000000AA", secret: "1x0000000000000000000000000000000AA" };
+
 // Frontends build from the repo root so they can resolve the pnpm workspace packages.
 function frontend(name: "client" | "admin" | "superadmin" | "landing", repo: ReturnType<typeof github>, environment: "production" | "staging") {
+  const turnstile: Record<string, string | ReturnType<typeof preserve>> = name === "landing" ? { VITE_TURNSTILE_SITE_KEY: environment === "production" ? preserve() : turnstileTestKeys.site } : {};
+
   return service(name, {
     source: repo,
     replicas: { [region]: 1 },
@@ -17,6 +23,7 @@ function frontend(name: "client" | "admin" | "superadmin" | "landing", repo: Ret
       VITE_API_URL: "https://${{api.RAILWAY_PUBLIC_DOMAIN}}",
       // Non-production builds get a red "S" favicon and a STAGING marker in the UI.
       VITE_APP_ENV: environment,
+      ...turnstile,
     },
   });
 }
@@ -88,6 +95,7 @@ export default defineRailway((ctx) => {
       // ("smtp" in production, "log" in staging).
       ACCESS_REQUEST_NOTIFY_EMAIL: preserve(),
       ACCESS_REQUEST_MAILER: preserve(),
+      TURNSTILE_SECRET_KEY: environment === "production" ? preserve() : turnstileTestKeys.secret,
       CORS_ALLOWED_ORIGINS:
         "https://${{client.RAILWAY_PUBLIC_DOMAIN}},https://${{admin.RAILWAY_PUBLIC_DOMAIN}},https://${{superadmin.RAILWAY_PUBLIC_DOMAIN}},https://${{landing.RAILWAY_PUBLIC_DOMAIN}}" +
         landingOrigins,

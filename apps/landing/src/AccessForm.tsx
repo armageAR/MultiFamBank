@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useTurnstile } from './useTurnstile'
 
 const apiUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/$/, '')
 
@@ -15,6 +16,8 @@ export function AccessForm() {
   const nameInput = useRef<HTMLInputElement>(null)
   const emailInput = useRef<HTMLInputElement>(null)
   const thanks = useRef<HTMLHeadingElement>(null)
+  const humanCheck = useRef<HTMLDivElement>(null)
+  const turnstile = useTurnstile(humanCheck)
 
   // Screen readers hear the outcome: focus moves to the thanks, or to the first field to fix.
   useEffect(() => {
@@ -32,6 +35,11 @@ export function AccessForm() {
     const local: Errors = {}
     if (!name.trim()) local.name = 'Contanos tu nombre.'
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) local.email = 'Ese email no parece válido.'
+    if (!Object.keys(local).length && turnstile.enabled && !turnstile.token) {
+      local.form = turnstile.failed
+        ? 'No pudimos hacer la verificación de seguridad. Recargá la página y probá de nuevo.'
+        : 'Esperá a que termine la verificación de seguridad y volvé a tocar el botón.'
+    }
     showErrors(local)
     if (Object.keys(local).length) return
 
@@ -40,20 +48,24 @@ export function AccessForm() {
       const response = await fetch(`${apiUrl}/api/access-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ name: name.trim(), email: email.trim(), website }),
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), website, turnstile_token: turnstile.token || undefined }),
       })
+      // The token was used; a retry needs a new one.
+      if (!response.ok) turnstile.reset()
       const body = await response.json().catch(() => ({}))
       if (response.ok) {
+        turnstile.remove()
         setSent(body.data)
       } else if (response.status === 422) {
         const fields = (body.errors ?? {}) as Record<string, string[]>
-        showErrors({ name: fields.name?.[0], email: fields.email?.[0], form: fields.website?.[0] })
+        showErrors({ name: fields.name?.[0], email: fields.email?.[0], form: fields.website?.[0] ?? fields.turnstile_token?.[0] })
       } else if (response.status === 429) {
         setErrors({ form: 'Recibimos muchos intentos seguidos. Probá de nuevo en un rato.' })
       } else {
         setErrors({ form: 'No pudimos enviar la solicitud. Probá de nuevo en un momento.' })
       }
     } catch {
+      turnstile.reset()
       setErrors({ form: 'No pudimos conectarnos. Revisá tu conexión y probá de nuevo.' })
     } finally {
       setSending(false)
@@ -135,6 +147,8 @@ export function AccessForm() {
         <label htmlFor="fb-hp">No completes este campo</label>
         <input id="fb-hp" tabIndex={-1} autoComplete="new-password" value={website} onChange={(e) => setWebsite(e.target.value)} />
       </div>
+      {/* Cloudflare Turnstile: confirms a person is sending the form, usually without a click. */}
+      {turnstile.enabled && <div ref={humanCheck} className="min-h-[65px]" />}
       {errors.form && (
         <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
           {errors.form}
