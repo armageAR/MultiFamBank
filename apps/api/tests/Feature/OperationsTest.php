@@ -3,11 +3,13 @@
 namespace Tests\Feature;
 
 use App\Enums\BankStatus;
+use App\Models\AuditLog;
 use App\Models\Bank;
 use App\Models\BankMembership;
 use App\Models\LedgerEntry;
 use App\Models\MoneyRequest;
 use App\Models\SavingsAccount;
+use App\Models\SavingsReservation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory;
@@ -221,6 +223,163 @@ class OperationsTest extends TestCase
         $pending = $this->ask(['type' => 'savings_deposit', 'amount_ars' => '1100'])->json('data.id');
         $this->asAdmin();
         $this->putJson("/api/admin/operations/$pending/date", ['occurred_at' => '2026-08-20T15:00:00Z'])->assertJsonValidationErrors('occurred_at');
+    }
+
+    /** Records a confirmed operation as the administrator and returns its id. */
+    private function record(array $data): string
+    {
+        $this->asAdmin();
+
+        return $this->postJson("/api/admin/clients/{$this->membership->id}/operations", $data)->assertCreated()->json('data.id');
+    }
+
+    public function test_the_amount_of_a_confirmed_deposit_or_withdrawal_moves_the_balance_at_its_rate(): void
+    {
+        $deposit = $this->record(['type' => 'savings_deposit', 'amount_ars' => '50000', 'exchange_rate' => '1000']);
+        $withdrawal = $this->record(['type' => 'savings_withdrawal', 'amount_ars' => '20000', 'exchange_rate' => '1000']);
+        $this->assertSame('130.00', (string) $this->account()->balance_usd);
+
+        // Rate kept: 80000 / 1000 = 80 USD, 30 more than before.
+        $this->putJson("/api/admin/operations/$deposit/amount", ['amount_ars' => '80000'])
+            ->assertOk()->assertJsonPath('data.amount_usd', '80.00')->assertJsonPath('data.exchange_rate', '1000.0000');
+        $this->assertSame('160.00', (string) $this->account()->balance_usd);
+        $this->putJson("/api/admin/operations/$withdrawal/amount", ['amount_ars' => '5000'])->assertOk();
+        $this->assertSame('175.00', (string) $this->account()->balance_usd);
+
+        $entry = LedgerEntry::where('money_request_id', $deposit)->sole();
+        $this->assertSame(['80000.00', '80.00'], [(string) $entry->amount_ars, (string) $entry->amount_usd]);
+        $this->assertSame('5.00', (string) LedgerEntry::where('money_request_id', $withdrawal)->sole()->amount_usd);
+        // Recorded by the administrator: there is no client request to compare the new amount with.
+        $this->getJson("/api/admin/clients/{$this->membership->id}/operations")->assertJsonPath('data.0.changed_by_admin', false);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'request.amount_changed', 'subject_id' => $deposit]);
+    }
+
+    public function test_an_amount_change_cannot_take_more_than_the_available_balance(): void
+    {
+        $deposit = $this->record(['type' => 'savings_deposit', 'amount_ars' => '50000', 'exchange_rate' => '1000']);
+        // 150 USD, 140 of them reserved by a pending withdrawal: 10 available.
+        $this->ask(['type' => 'savings_withdrawal', 'amount_ars' => '140000']);
+        $this->asAdmin();
+
+        $this->putJson("/api/admin/operations/$deposit/amount", ['amount_ars' => '30000'])
+            ->assertJsonValidationErrors(['amount_ars' => 'el saldo disponible es USD 10.00']);
+        $this->putJson("/api/admin/operations/$deposit/amount", ['amount_ars' => '40000'])->assertOk();
+        $this->assertSame(['140.00', '140.00'], [(string) $this->account()->balance_usd, (string) $this->account()->reserved_usd]);
+    }
+
+    public function test_the_amount_of_an_expense_changes_without_touching_savings(): void
+    {
+        $id = $this->record(['type' => 'expense', 'amount_ars' => '8000', 'description' => 'Útiles']);
+
+        $this->putJson("/api/admin/operations/$id/amount", ['amount_ars' => '9500,5'])->assertJsonValidationErrors('amount_ars');
+        $this->putJson("/api/admin/operations/$id/amount", ['amount_ars' => '0'])->assertJsonValidationErrors('amount_ars');
+        $this->putJson("/api/admin/operations/$id/amount", ['amount_ars' => '9500.50'])->assertOk()->assertJsonPath('data.amount_usd', null);
+
+        $this->assertSame('9500.50', (string) LedgerEntry::where('money_request_id', $id)->sole()->amount_ars);
+        $this->assertSame('100.00', (string) $this->account()->balance_usd);
+    }
+
+    public function test_deleting_a_confirmed_operation_undoes_it(): void
+    {
+        $deposit = $this->record(['type' => 'savings_deposit', 'amount_ars' => '50000', 'exchange_rate' => '1000']);
+        $expense = $this->record(['type' => 'expense', 'amount_ars' => '8000', 'description' => 'Útiles']);
+        // A withdrawal confirmed from a request: it has a settled reservation.
+        $withdrawal = $this->ask(['type' => 'savings_withdrawal', 'amount_ars' => '20000'])->json('data.id');
+        $this->asAdmin();
+        $this->postJson("/api/admin/operations/$withdrawal/confirm")->assertOk();
+        $this->assertSame('130.00', (string) $this->account()->balance_usd);
+
+        // A client's request corrected after confirmation still shows what was asked.
+        $this->putJson("/api/admin/operations/$withdrawal/amount", ['amount_ars' => '25000'])->assertOk()
+            ->assertJsonPath('data.changed_by_admin', true)->assertJsonPath('data.requested.amount_ars', '20000.00');
+        $this->assertSame('125.00', (string) $this->account()->balance_usd);
+
+        $this->deleteJson("/api/admin/operations/$withdrawal")->assertNoContent();
+        $this->deleteJson("/api/admin/operations/$deposit")->assertNoContent();
+        $this->deleteJson("/api/admin/operations/$expense")->assertNoContent();
+
+        $this->assertSame(['100.00', '0.00'], [(string) $this->account()->balance_usd, (string) $this->account()->reserved_usd]);
+        $this->assertSame(0, MoneyRequest::count() + LedgerEntry::count() + SavingsReservation::count());
+        $this->getJson("/api/admin/clients/{$this->membership->id}/operations")->assertOk()->assertJsonCount(0, 'data');
+        $this->assertDatabaseHas('audit_logs', ['action' => 'request.deleted', 'subject_id' => $deposit]);
+        $this->deleteJson("/api/admin/operations/$deposit")->assertNotFound();
+    }
+
+    public function test_a_deposit_whose_dollars_were_withdrawn_cannot_be_deleted(): void
+    {
+        $deposit = $this->record(['type' => 'savings_deposit', 'amount_ars' => '50000', 'exchange_rate' => '1000']);
+        $this->record(['type' => 'savings_withdrawal', 'amount_ars' => '120000', 'exchange_rate' => '1000']);
+
+        $this->deleteJson("/api/admin/operations/$deposit")
+            ->assertJsonValidationErrors(['request' => 'No se puede eliminar este depósito: el saldo disponible es USD 30.00']);
+
+        $this->assertSame('30.00', (string) $this->account()->balance_usd);
+        $this->assertNotNull(MoneyRequest::find($deposit));
+    }
+
+    public function test_a_correction_cannot_leave_an_earlier_withdrawal_without_its_dollars(): void
+    {
+        // 100 USD to start; January deposit, February withdrawal of everything, March deposit.
+        $january = $this->record(['type' => 'savings_deposit', 'amount_ars' => '100000', 'exchange_rate' => '1000', 'occurred_at' => '2026-01-10T12:00:00Z']);
+        $february = $this->record(['type' => 'savings_withdrawal', 'amount_ars' => '200000', 'exchange_rate' => '1000', 'occurred_at' => '2026-02-10T12:00:00Z']);
+        $this->record(['type' => 'savings_deposit', 'amount_ars' => '100000', 'exchange_rate' => '1000', 'occurred_at' => '2026-03-10T12:00:00Z']);
+        $this->assertSame('100.00', (string) $this->account()->balance_usd);
+
+        // Today's balance would cover it, but in February the balance would have been −100.
+        $this->deleteJson("/api/admin/operations/$january")
+            ->assertJsonValidationErrors(['request' => 'el saldo del 10/02/2026 quedaría en USD -100.00']);
+        $this->putJson("/api/admin/operations/$january/amount", ['amount_ars' => '50000'])->assertJsonValidationErrors('amount_ars');
+        $this->putJson("/api/admin/operations/$february/amount", ['amount_ars' => '250000'])->assertJsonValidationErrors('amount_ars');
+        $this->putJson("/api/admin/operations/$january/date", ['occurred_at' => '2026-02-20T12:00:00Z'])->assertJsonValidationErrors('occurred_at');
+
+        // Nothing changed.
+        $this->assertSame('100.00', (string) $this->account()->balance_usd);
+        $this->assertSame(['100.00', '200.00'], [(string) MoneyRequest::find($january)->amount_usd, (string) MoneyRequest::find($february)->amount_usd]);
+        $this->assertSame('2026-01-10', LedgerEntry::where('money_request_id', $january)->sole()->occurred_at->toDateString());
+
+        // Corrections that keep every balance at zero or above go through.
+        $this->putJson("/api/admin/operations/$february/amount", ['amount_ars' => '150000'])->assertOk();
+        $this->putJson("/api/admin/operations/$january/amount", ['amount_ars' => '50000'])->assertOk();
+        $this->assertSame('100.00', (string) $this->account()->balance_usd);
+    }
+
+    public function test_a_deleted_request_does_not_come_back_when_the_offline_queue_retries_it(): void
+    {
+        $id = (string) Str::uuid();
+        $this->ask(['id' => $id, 'type' => 'expense', 'amount_ars' => '5000', 'description' => 'Cine'])->assertCreated();
+        $this->asAdmin();
+        $this->postJson("/api/admin/operations/$id/confirm")->assertOk();
+        $this->deleteJson("/api/admin/operations/$id")->assertNoContent();
+
+        $this->ask(['id' => $id, 'type' => 'expense', 'amount_ars' => '5000', 'description' => 'Cine'])
+            ->assertJsonValidationErrors(['id' => 'el administrador lo eliminó']);
+        $this->assertSame(0, MoneyRequest::count());
+
+        $log = AuditLog::where('action', 'request.deleted')->sole();
+        $this->assertSame([$this->membership->id, 'expense', '5000.00'], [$log->old_values['bank_membership_id'], $log->old_values['requested_type'], $log->old_values['requested_amount_ars']]);
+    }
+
+    public function test_only_confirmed_operations_of_an_active_bank_can_be_corrected(): void
+    {
+        $pending = $this->ask(['type' => 'savings_deposit', 'amount_ars' => '1100'])->json('data.id');
+        $confirmed = $this->record(['type' => 'expense', 'amount_ars' => '8000', 'description' => 'Útiles']);
+
+        $this->putJson("/api/admin/operations/$pending/amount", ['amount_ars' => '2000'])->assertJsonValidationErrors('amount_ars');
+        $this->deleteJson("/api/admin/operations/$pending")->assertJsonValidationErrors('request');
+
+        $this->bank->update(['status' => BankStatus::Paused]);
+        $this->putJson("/api/admin/operations/$confirmed/amount", ['amount_ars' => '2000'])->assertJsonValidationErrors('bank');
+        $this->deleteJson("/api/admin/operations/$confirmed")->assertJsonValidationErrors('bank');
+
+        Sanctum::actingAs($this->client);
+        $this->putJson("/api/admin/operations/$confirmed/amount", ['amount_ars' => '2000'])->assertForbidden();
+        $this->deleteJson("/api/admin/operations/$confirmed")->assertForbidden();
+
+        $otherAdmin = User::factory()->create();
+        Bank::create(['name' => 'Otra', 'admin_email' => $otherAdmin->email, 'admin_user_id' => $otherAdmin->id, 'status' => BankStatus::Active]);
+        Sanctum::actingAs($otherAdmin);
+        $this->deleteJson("/api/admin/operations/$confirmed")->assertNotFound();
+        $this->assertNotNull(MoneyRequest::find($confirmed));
     }
 
     public function test_a_paused_bank_is_read_only(): void

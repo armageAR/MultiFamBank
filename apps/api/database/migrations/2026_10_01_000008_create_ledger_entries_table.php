@@ -9,7 +9,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Confirmed movements: savings credits/debits and bank-funded expenses. Append-only.
+        // Confirmed movements: savings credits/debits and bank-funded expenses. Only the administrator's
+        // corrections of a confirmed operation (amount, date, deletion) rewrite or remove a row.
         Schema::create('ledger_entries', function (Blueprint $table) {
             $table->id();
             $table->foreignId('bank_id')->constrained()->restrictOnDelete();
