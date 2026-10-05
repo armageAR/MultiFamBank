@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Mail\AccessRequestReceivedMail;
 use App\Models\AccessRequest;
 use App\Models\User;
+use App\Services\Turnstile;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,19 +20,26 @@ class AccessRequestController extends Controller
 {
     private const DUPLICATE = 'Ya tenemos una solicitud con este email. Te vamos a contactar pronto.';
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, Turnstile $turnstile): JsonResponse
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email:rfc', 'max:255'],
             // Honeypot: hidden from people, filled by bots.
             'website' => ['nullable', 'string', 'max:0'],
+            // Cloudflare Turnstile token, when the check is on.
+            'turnstile_token' => ['nullable', 'string'],
         ], [
             'name.required' => 'Contanos tu nombre.',
             'email.required' => 'Necesitamos tu email para contactarte.',
             'email.email' => 'Ese email no parece válido.',
             'website.max' => 'No se pudo enviar la solicitud.',
         ]);
+
+        // Before looking the email up, so the form cannot be used to probe which emails asked.
+        if (! $turnstile->verify($data['turnstile_token'] ?? null, $request->ip())) {
+            throw ValidationException::withMessages(['turnstile_token' => 'No pudimos confirmar que seas una persona. Probá de nuevo.']);
+        }
 
         $email = User::normalizeEmail($data['email']);
         if (AccessRequest::where('email', $email)->exists()) {
