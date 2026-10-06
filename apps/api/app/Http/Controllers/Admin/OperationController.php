@@ -9,6 +9,7 @@ use App\Models\Bank;
 use App\Models\MoneyRequest;
 use App\Services\Notifier;
 use App\Services\Operations;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -60,6 +61,25 @@ class OperationController extends Controller
         $this->notifier->dateChanged($operation);
 
         return new MoneyRequestResource($operation->load('membership.user'));
+    }
+
+    public function changeAmount(Request $request, MoneyRequest $moneyRequest): MoneyRequestResource
+    {
+        $this->own($request, $moneyRequest);
+        $data = $request->validate(['amount_ars' => ['required', ...OperationRules::amount()]]);
+        $operation = $this->operations->changeAmount($moneyRequest, $request->user(), (string) $data['amount_ars']);
+        $this->notifier->amountChanged($operation);
+
+        return new MoneyRequestResource($operation->load('membership.user'));
+    }
+
+    public function destroy(Request $request, MoneyRequest $moneyRequest): JsonResponse
+    {
+        $this->own($request, $moneyRequest);
+        $operation = $this->operations->delete($moneyRequest, $request->user());
+        $this->notifier->operationDeleted($operation);
+
+        return response()->json(null, 204);
     }
 
     private function bank(Request $request): Bank

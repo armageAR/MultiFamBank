@@ -74,6 +74,31 @@ class Notifier
         ]);
     }
 
+    public function amountChanged(MoneyRequest $request): void
+    {
+        $request->loadMissing('membership.user');
+
+        $this->later($request->membership->user, [
+            'title' => 'Importe de operación modificado',
+            'body' => 'El administrador corrigió el importe: ahora es '.$this->what($request).'.',
+            'url' => $this->clientUrl($request),
+            'tag' => 'request-'.$request->id,
+        ]);
+    }
+
+    /** The operation no longer exists, so the link opens the bank only. */
+    public function operationDeleted(MoneyRequest $request): void
+    {
+        $request->loadMissing('membership.user');
+
+        $this->later($request->membership->user, [
+            'title' => 'Operación eliminada',
+            'body' => 'El administrador eliminó '.$this->what($request).'.',
+            'url' => config('multifambank.urls.client').'/?'.http_build_query(['banco' => $request->bank_id]),
+            'tag' => 'request-'.$request->id,
+        ]);
+    }
+
     /** Opens the client app on the operation's bank, with the operation highlighted. */
     private function clientUrl(MoneyRequest $request): string
     {

@@ -75,6 +75,12 @@ class PushNotificationsTest extends TestCase
         $this->assertSame([$admin->id, 'Nuevo pedido', 'Sofía pide un gasto de $ 15.000: Salida'], array_slice($sent[0], 0, 3));
         $this->assertSame([$client->id, 'Pedido confirmado', 'Se confirmó un gasto de $ 12.000 (con cambios del administrador).'], array_slice($sent[1], 0, 3));
         $this->assertSame(config('multifambank.urls.client')."/?banco={$bank->id}&operacion=$id", $sent[1][3]);
+
+        $this->putJson("/api/admin/operations/$id/amount", ['amount_ars' => '13000'])->assertOk();
+        $this->deleteJson("/api/admin/operations/$id")->assertNoContent();
+
+        $this->assertSame([$client->id, 'Importe de operación modificado', 'El administrador corrigió el importe: ahora es un gasto de $ 13.000.'], array_slice($sent[2], 0, 3));
+        $this->assertSame([$client->id, 'Operación eliminada', 'El administrador eliminó un gasto de $ 13.000.', config('multifambank.urls.client')."/?banco={$bank->id}"], $sent[3]);
     }
 
     public function test_only_known_push_services_can_be_registered(): void

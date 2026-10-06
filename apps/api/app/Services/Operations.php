@@ -30,6 +30,10 @@ use Illuminate\Support\Str;
  * Every write locks the bank (shared, so a pause or deactivation cannot interleave), then the
  * request, then the savings account. Pending withdrawals reserve USD so the available balance can
  * never go negative; the reservation is released or settled exactly once.
+ *
+ * The administrator may correct a confirmed operation (amount, date) or delete it. Its ledger entry
+ * is rewritten or removed in the same transaction, so balances and reports stay consistent, and the
+ * client's balance may never have been negative at any point of their history.
  */
 class Operations
 {
@@ -50,6 +54,12 @@ class Operations
 
         if ($existing = MoneyRequest::find($id)) {
             return $this->replay($existing, $membership, $input);
+        }
+
+        // A request queued offline, received, confirmed and then deleted must not come back when the
+        // queue retries it with the same id.
+        if (AuditLog::where('action', 'request.deleted')->where('subject_id', $id)->exists()) {
+            throw new DomainRuleException('id', 'Este pedido ya fue recibido y después el administrador lo eliminó.');
         }
 
         $type = MoneyRequestType::from($input['type']);
@@ -258,10 +268,85 @@ class Operations
             }
 
             $before = $request->occurred_at?->toIso8601String();
+            $earliest = $request->occurred_at?->min(Carbon::parse($occurredAt)) ?? Carbon::parse($occurredAt);
             $request->forceFill(['occurred_at' => Carbon::parse($occurredAt)])->save();
             LedgerEntry::where('money_request_id', $request->id)->update(['occurred_at' => $request->occurred_at]);
+            // Moving a deposit after a withdrawal it paid for would leave the balance negative in between.
+            $this->assertHistoryNeverNegative($request, $earliest, 'occurred_at');
 
             AuditLog::record('request.date_changed', $request, $request->bank_id, ['occurred_at' => $before], ['occurred_at' => $request->occurred_at->toIso8601String()]);
+
+            return $request;
+        }, attempts: 3);
+    }
+
+    /**
+     * Corrects the amount of a confirmed operation. Savings operations keep their recorded rate: the
+     * dollars are recalculated and the difference is applied to the balance.
+     */
+    public function changeAmount(MoneyRequest $request, User $admin, string $amountArs): MoneyRequest
+    {
+        return DB::transaction(function () use ($request, $amountArs) {
+            $this->lockWritableBank($request->bank_id);
+            $request = $this->lockConfirmed($request, 'amount_ars', 'Solo se puede modificar el importe de operaciones confirmadas; un pedido pendiente se edita al revisarlo.');
+            $before = $this->snapshot($request);
+            $oldUsd = (string) $request->amount_usd;
+
+            $request->amount_ars = $amountArs;
+            $this->refreshUsd($request);
+
+            if ($request->type !== MoneyRequestType::Expense) {
+                // Dollars that leave the balance: more for a bigger withdrawal, less for a smaller deposit.
+                $out = $request->type === MoneyRequestType::SavingsWithdrawal
+                    ? Money::sub((string) $request->amount_usd, $oldUsd)
+                    : Money::sub($oldUsd, (string) $request->amount_usd);
+                $this->moveBalance($request, $out, 'amount_ars', 'No alcanza el saldo para este cambio');
+            }
+
+            $request->save();
+            LedgerEntry::where('money_request_id', $request->id)->update(['amount_ars' => $request->amount_ars, 'amount_usd' => $request->amount_usd]);
+            SavingsReservation::where('money_request_id', $request->id)->whereNotNull('settled_at')->update(['amount_usd' => $request->amount_usd]);
+            $this->assertHistoryNeverNegative($request, $request->occurred_at, 'amount_ars');
+
+            AuditLog::record('request.amount_changed', $request, $request->bank_id, $before, $this->snapshot($request));
+
+            return $request;
+        }, attempts: 3);
+    }
+
+    /**
+     * Deletes a confirmed operation as if it never happened: its effect on the balance is undone and
+     * it leaves the history and the reports. The audit log keeps what it was.
+     */
+    public function delete(MoneyRequest $request, User $admin): MoneyRequest
+    {
+        return DB::transaction(function () use ($request) {
+            $this->lockWritableBank($request->bank_id);
+            $request = $this->lockConfirmed($request, 'request', 'Solo se pueden eliminar operaciones confirmadas; un pedido pendiente se rechaza.');
+            // The row goes away: the audit log keeps everything needed to know whose operation it was.
+            $before = $this->snapshot($request) + [
+                'bank_membership_id' => $request->bank_membership_id,
+                'requested_type' => $request->requested_type->value,
+                'requested_amount_ars' => (string) $request->requested_amount_ars,
+                'requested_description' => $request->requested_description,
+                'created_by' => $request->created_by,
+                'confirmed_by' => $request->confirmed_by,
+                'confirmed_at' => $request->confirmed_at?->toIso8601String(),
+            ];
+
+            if ($request->type !== MoneyRequestType::Expense) {
+                $usd = (string) $request->amount_usd;
+                // Deleting a deposit takes its dollars back; deleting a withdrawal returns them.
+                $out = $request->type === MoneyRequestType::SavingsDeposit ? $usd : Money::sub('0', $usd);
+                $this->moveBalance($request, $out, 'request', 'No se puede eliminar este depósito');
+            }
+
+            LedgerEntry::where('money_request_id', $request->id)->delete();
+            SavingsReservation::where('money_request_id', $request->id)->delete();
+            $request->delete();
+            $this->assertHistoryNeverNegative($request, $request->occurred_at, 'request');
+
+            AuditLog::record('request.deleted', $request, $request->bank_id, $before);
 
             return $request;
         }, attempts: 3);
@@ -294,6 +379,73 @@ class Operations
         }
 
         return $request;
+    }
+
+    private function lockConfirmed(MoneyRequest $request, string $field, string $message): MoneyRequest
+    {
+        $request = MoneyRequest::whereKey($request->id)->lockForUpdate()->firstOrFail();
+
+        if ($request->status !== MoneyRequestStatus::Confirmed) {
+            throw new DomainRuleException($field, $message);
+        }
+
+        return $request;
+    }
+
+    /**
+     * Takes `$out` dollars out of the client's savings (a negative amount puts them back). The
+     * available balance may never go negative: those dollars may already have been withdrawn.
+     */
+    private function moveBalance(MoneyRequest $request, string $out, string $field, string $insufficient): void
+    {
+        $account = $this->account($request);
+
+        if (Money::greaterThan($out, $account->availableUsd())) {
+            throw new DomainRuleException($field, "$insufficient: el saldo disponible es USD {$account->availableUsd()}.");
+        }
+
+        $account->balance_usd = Money::sub((string) $account->balance_usd, $out);
+
+        if (Money::greaterThan((string) $account->balance_usd, self::MAX_USD)) {
+            throw new DomainRuleException($field, 'El saldo resultante es demasiado grande.');
+        }
+
+        $account->save();
+    }
+
+    /**
+     * Walks the client's savings backwards from today's balance to `$from` and refuses if the balance
+     * after any of those movements is negative: a correction may not leave an earlier withdrawal
+     * without the dollars it took. Runs after the ledger was updated, inside the same transaction
+     * (the savings account is locked), so an exception undoes the correction.
+     */
+    private function assertHistoryNeverNegative(MoneyRequest $request, ?Carbon $from, string $field): void
+    {
+        if ($request->type === MoneyRequestType::Expense || $from === null) {
+            return;
+        }
+
+        $account = $this->account($request);
+        $balance = (string) $account->balance_usd;
+        $entries = LedgerEntry::where('savings_account_id', $account->id)->where('occurred_at', '>=', $from)
+            ->orderByDesc('occurred_at')->orderByDesc('id')->get(['kind', 'amount_usd', 'occurred_at']);
+
+        foreach ($entries as $entry) {
+            if (bccomp($balance, '0', 2) < 0) {
+                $this->refuseNegativeHistory($request, $entry->occurred_at, $balance, $field);
+            }
+
+            $balance = $entry->kind === LedgerEntryKind::SavingsCredit
+                ? Money::sub($balance, (string) $entry->amount_usd)
+                : Money::add($balance, (string) $entry->amount_usd);
+        }
+    }
+
+    private function refuseNegativeHistory(MoneyRequest $request, Carbon $when, string $balance, string $field): never
+    {
+        $date = $when->timezone($request->bank()->value('timezone') ?? config('app.timezone'))->format('d/m/Y');
+
+        throw new DomainRuleException($field, "No se puede: el saldo del $date quedaría en USD $balance. Ese día ya se había retirado esa plata.");
     }
 
     /** @param  array<string, mixed>  $changes */

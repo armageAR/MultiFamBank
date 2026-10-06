@@ -4,7 +4,7 @@ MultiFamBank is the next version of [FamBank](https://github.com/armageAR/famban
 
 Each family operates an independent **bank**, with its own administrator, clients, savings accounts, requests, and expense reports. Clients can belong to multiple banks, while a person can administer only one bank.
 
-> **Project status:** The monorepo is deployed to Railway. Implemented: the full database schema; sign-in and password reset; the platform superadmin application (banks, administrator invitations and management, pause/deactivate/reactivate); the bank administrator application (dashboard with balances and quotes, client invitations and management, pending requests with edit/confirm/reject, operations recorded on a client's behalf, per-client history with date changes, monthly expense report, push notifications, read-only offline); and the client application (accept invitation, savings in USD and ARS, blue quotes, separate deposit (green) and withdrawal (red) forms that accept pesos or dollars and show the quote in use, a separate expense form, history showing administrator changes, cancel, "Mi cuenta" for email and password, an optional fingerprint/face lock per device, several banks, push notifications, and requests prepared offline that synchronize when the connection returns). The original FamBank repository contains the first working version.
+> **Project status:** The monorepo is deployed to Railway. Implemented: the full database schema; sign-in and password reset; the platform superadmin application (banks, administrator invitations and management, pause/deactivate/reactivate); the bank administrator application (dashboard with balances and quotes, client invitations and management, pending requests with edit/confirm/reject, operations recorded on a client's behalf, per-client history where confirmed operations can have their amount or date corrected or be deleted, monthly expense report, push notifications, read-only offline); and the client application (accept invitation, savings in USD and ARS, blue quotes, separate deposit (green) and withdrawal (red) forms that accept pesos or dollars and show the quote in use, a separate expense form, history showing administrator changes, cancel, "Mi cuenta" for email and password, an optional fingerprint/face lock per device, several banks, push notifications, and requests prepared offline that synchronize when the connection returns). The original FamBank repository contains the first working version.
 
 In this project, “bank” means a private family ledger. MultiFamBank does not hold money, transfer funds, execute currency exchange, or provide banking services. Administrators record money received or delivered outside the application.
 
@@ -141,7 +141,13 @@ On a pending request of any type, the administrator can change everything before
 - The operation date.
 - The exchange rate, when the operation moves client savings.
 
-After confirmation, only the **operation date** can still be changed; amounts and types are final because they already changed balances. Changing the date moves the operation between months in reports.
+After confirmation, the administrator can still correct an operation from the client's history (gear icon at the bottom right of each row):
+
+- **Modificar importe**: a new amount in pesos. Savings operations keep their recorded rate; the dollars are recalculated and the balance moves by the difference.
+- **Cambiar fecha**: moves the operation between months in reports; balances do not change.
+- **Eliminar** (after a confirmation): undoes the operation as if it never happened. A deposit's dollars leave the balance, a withdrawal's come back, and an expense leaves the reports. The audit log keeps what it was.
+
+The type cannot change after confirmation. A correction that would take more dollars than the client has available is refused, for example deleting a deposit whose dollars were already withdrawn. A correction may also not leave the balance negative at any earlier point, for example deleting a January deposit that paid for a February withdrawal; the same applies to date changes. The client receives a push notification for each correction, and a request deleted this way cannot come back from the offline queue.
 
 The original request (type, amount, comment) and the final values are both retained, and every change is recorded in the audit log with who made it. Clients can see when their request was changed.
 

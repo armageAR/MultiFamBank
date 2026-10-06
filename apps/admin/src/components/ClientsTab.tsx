@@ -230,7 +230,14 @@ export function ClientsTab({ readOnly }: { readOnly: boolean }) {
           </Button>
         </Modal>
       )}
-      {dialog?.kind === 'history' && <HistoryModal client={dialog.client} readOnly={readOnly} onClose={() => setDialog(null)} />}
+      {/* The fresh row, so the balance follows corrections made from the history. */}
+      {dialog?.kind === 'history' && (
+        <HistoryModal
+          client={clients.data?.clients.find((client) => client.membership_id === dialog.client.membership_id) ?? dialog.client}
+          readOnly={readOnly}
+          onClose={() => setDialog(null)}
+        />
+      )}
     </div>
   )
 }

@@ -90,6 +90,8 @@ Route::prefix('admin')->middleware(['auth:sanctum', EnsureBankAdmin::class])->gr
     Route::post('/operations/{moneyRequest}/confirm', [AdminOperationController::class, 'confirm']);
     Route::post('/operations/{moneyRequest}/reject', [AdminOperationController::class, 'reject']);
     Route::put('/operations/{moneyRequest}/date', [AdminOperationController::class, 'changeDate']);
+    Route::put('/operations/{moneyRequest}/amount', [AdminOperationController::class, 'changeAmount']);
+    Route::delete('/operations/{moneyRequest}', [AdminOperationController::class, 'destroy']);
 });
 
 Route::prefix('client')->middleware('auth:sanctum')->group(function () {

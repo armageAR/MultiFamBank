@@ -12,6 +12,7 @@ class MoneyRequestResource extends JsonResource
     public function toArray(Request $request): array
     {
         $client = $this->membership?->user;
+        $recordedByAdmin = $client !== null && $this->created_by !== $client->id;
 
         return [
             'id' => $this->id,
@@ -34,10 +35,14 @@ class MoneyRequestResource extends JsonResource
                 'amount_ars' => (string) $this->requested_amount_ars,
                 'description' => $this->requested_description,
             ],
-            'changed_by_admin' => $this->requested_type !== $this->type
+            // Only a client's request has an original to compare with; a correction of an operation the
+            // administrator recorded is not "a change to what was asked".
+            'changed_by_admin' => ! $recordedByAdmin && (
+                $this->requested_type !== $this->type
                 || bccomp((string) $this->requested_amount_ars, (string) $this->amount_ars, 2) !== 0
-                || $this->requested_description !== $this->description,
-            'recorded_by_admin' => $client !== null && $this->created_by !== $client->id,
+                || $this->requested_description !== $this->description
+            ),
+            'recorded_by_admin' => $recordedByAdmin,
             'client' => $client ? [
                 'membership_id' => $this->bank_membership_id,
                 'name' => $client->name,

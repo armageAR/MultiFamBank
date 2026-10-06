@@ -290,6 +290,17 @@ export async function changeOperationDate(client: AxiosInstance, id: string, occ
   return data.data
 }
 
+/** Corrects a confirmed operation's amount; savings keep their rate and the balance moves by the difference. */
+export async function changeOperationAmount(client: AxiosInstance, id: string, amountArs: string): Promise<Operation> {
+  const { data } = await client.put<{ data: Operation }>(`/admin/operations/${id}/amount`, { amount_ars: amountArs })
+  return data.data
+}
+
+/** Deletes a confirmed operation, undoing its effect on the balance. */
+export async function deleteOperation(client: AxiosInstance, id: string): Promise<void> {
+  await client.delete(`/admin/operations/${id}`)
+}
+
 // Client
 
 export async function fetchClientBanks(client: AxiosInstance): Promise<ClientBank[]> {
